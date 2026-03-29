@@ -1,0 +1,153 @@
+{% extends "base.html" %}
+{% block title %}Inventory — card-vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>inventory</h1>
+  <a href="/import" class="btn btn-primary">+ import</a>
+</div>
+
+{% if stats %}
+<div class="stats-bar">
+  <div class="stat">
+    <span class="stat-label">lots</span>
+    <span class="stat-value">{{ stats.lot_count }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">total cards</span>
+    <span class="stat-value">{{ stats.total_cards }}</span>
+  </div>
+  <div class="stat">
+    <span class="stat-label">est. value</span>
+    <span class="stat-value">${{ "%.2f"|format(stats.est_value) }}</span>
+  </div>
+</div>
+{% endif %}
+
+<form method="GET" action="/inventory" class="filter-bar">
+  <div class="form-group">
+    <label>Search</label>
+    <input type="text" name="q" value="{{ params.q }}" placeholder="name, set…">
+  </div>
+  <div class="form-group">
+    <label>Set</label>
+    <input type="text" name="set" value="{{ params.set }}" placeholder="e.g. lea">
+  </div>
+  <div class="form-group">
+    <label>Condition</label>
+    <select name="condition">
+      <option value="">Any</option>
+      {% for cond in ["NM","LP","MP","HP","DMG","PLD"] %}
+      <option value="{{ cond }}" {% if params.condition == cond %}selected{% endif %}>{{ cond }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Foil</label>
+    <select name="foil">
+      <option value="">Any</option>
+      <option value="1" {% if params.foil == "1" %}selected{% endif %}>Foil</option>
+      <option value="0" {% if params.foil == "0" %}selected{% endif %}>Non-foil</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label>Sort</label>
+    <select name="sort">
+      <option value="name" {% if params.sort == "name" or not params.sort %}selected{% endif %}>Name</option>
+      <option value="set" {% if params.sort == "set" %}selected{% endif %}>Set</option>
+      <option value="price" {% if params.sort == "price" %}selected{% endif %}>Price</option>
+      <option value="qty" {% if params.sort == "qty" %}selected{% endif %}>Quantity</option>
+    </select>
+  </div>
+  <div class="form-group" style="flex:0;">
+    <label>&nbsp;</label>
+    <button type="submit" class="btn btn-secondary">filter</button>
+  </div>
+</form>
+
+<div style="overflow-x:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Set</th>
+        <th>Condition</th>
+        <th>Qty</th>
+        <th>Location</th>
+        <th>Price</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for lot in lots %}
+      <tr>
+        <td>
+          <div style="display:flex;align-items:center;gap:10px;">
+            {% if lot.image_uri %}
+            <img src="{{ lot.image_uri }}" alt="" style="height:28px;border-radius:2px;" loading="lazy">
+            {% endif %}
+            <div>
+              <div style="font-weight:500;">{{ lot.name }}</div>
+              {% if lot.collector_number %}
+              <div class="text-dim mono" style="font-size:11px;">#{{ lot.collector_number }}</div>
+              {% endif %}
+            </div>
+          </div>
+        </td>
+        <td class="mono" style="font-size:12px;">
+          {% if lot.set_code %}
+          <span style="color:var(--accent);">{{ lot.set_code | upper }}</span>
+          {% if lot.set_name %}
+          <span class="text-dim"> · {{ lot.set_name }}</span>
+          {% endif %}
+          {% else %}
+          <span class="text-dim">—</span>
+          {% endif %}
+        </td>
+        <td>
+          <span class="badge badge-{{ lot.condition | lower }}">{{ lot.condition }}</span>
+          {% if lot.foil %}
+          <span class="badge badge-foil" style="margin-left:4px;">foil</span>
+          {% endif %}
+        </td>
+        <td class="mono">{{ lot.quantity }}</td>
+        <td class="text-dim" style="font-size:12px;">{{ lot.location_name }}</td>
+        <td class="mono" style="font-size:12px;">
+          {% if lot.price_usd %}
+          ${{ "%.2f"|format(lot.price_usd) }}
+          {% else %}
+          <span class="text-dim">—</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="/individuals/new?lot_id={{ lot.id }}" class="btn btn-secondary" style="font-size:11px;padding:3px 8px;">promote</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" style="text-align:center;color:var(--text-dim);padding:40px;">
+          No cards found. <a href="/import">Import a CSV</a> to get started.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if total_pages > 1 %}
+<div class="pagination">
+  {% if page > 1 %}
+  <a href="?page={{ page - 1 }}&q={{ params.q }}&set={{ params.set }}&condition={{ params.condition }}&foil={{ params.foil }}&sort={{ params.sort }}">&laquo;</a>
+  {% endif %}
+  {% for p in range(1, total_pages + 1) %}
+    {% if p == page %}
+    <span class="current">{{ p }}</span>
+    {% else %}
+    <a href="?page={{ p }}&q={{ params.q }}&set={{ params.set }}&condition={{ params.condition }}&foil={{ params.foil }}&sort={{ params.sort }}">{{ p }}</a>
+    {% endif %}
+  {% endfor %}
+  {% if page < total_pages %}
+  <a href="?page={{ page + 1 }}&q={{ params.q }}&set={{ params.set }}&condition={{ params.condition }}&foil={{ params.foil }}&sort={{ params.sort }}">&raquo;</a>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

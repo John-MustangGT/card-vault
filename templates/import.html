@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Import — card-vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>import cards</h1>
+</div>
+
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+{% if result %}
+<div class="alert alert-success">
+  Import complete &mdash;
+  <strong>{{ result.imported }}</strong> imported,
+  <strong>{{ result.updated }}</strong> updated,
+  <strong>{{ result.skipped }}</strong> skipped.
+  {% if result.errors and result.errors | length > 0 %}
+  <br><strong>Errors:</strong>
+  <ul style="margin-top:6px;padding-left:16px;">
+    {% for e in result.errors %}
+    <li style="font-size:12px;">{{ e }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="max-width:600px;">
+  <form method="POST" enctype="multipart/form-data" id="import-form">
+    <div class="form-group">
+      <label>CSV File</label>
+      <div id="drop-zone" style="
+        border: 2px dashed var(--border);
+        border-radius: 6px;
+        padding: 40px 20px;
+        text-align: center;
+        cursor: pointer;
+        transition: border-color 0.15s;
+        background: var(--surface2);
+      ">
+        <div style="font-family: var(--font-mono); font-size: 13px; color: var(--text-dim);">
+          drag &amp; drop CSV here, or <span style="color:var(--accent);">click to browse</span>
+        </div>
+        <div id="file-name" style="margin-top:8px;font-family:var(--font-mono);font-size:12px;color:var(--text-dim);"></div>
+        <div id="format-detected" style="margin-top:6px;display:none;"></div>
+        <input type="file" name="file" id="file-input" accept=".csv" style="display:none;" required>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>Conflict Strategy</label>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-top:4px;">
+        <label style="display:flex;align-items:flex-start;gap:10px;text-transform:none;font-size:13px;color:var(--text);cursor:pointer;">
+          <input type="radio" name="conflict_strategy" value="accumulate" checked style="width:auto;margin-top:3px;">
+          <span>
+            <strong style="font-family:var(--font-mono);font-size:12px;color:var(--accent);">accumulate</strong>
+            <span class="text-dim" style="display:block;font-size:12px;">Add quantities to existing lots (default for re-imports)</span>
+          </span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;text-transform:none;font-size:13px;color:var(--text);cursor:pointer;">
+          <input type="radio" name="conflict_strategy" value="skip" style="width:auto;margin-top:3px;">
+          <span>
+            <strong style="font-family:var(--font-mono);font-size:12px;color:var(--accent);">skip</strong>
+            <span class="text-dim" style="display:block;font-size:12px;">Skip rows that already exist in the database</span>
+          </span>
+        </label>
+        <label style="display:flex;align-items:flex-start;gap:10px;text-transform:none;font-size:13px;color:var(--text);cursor:pointer;">
+          <input type="radio" name="conflict_strategy" value="replace" style="width:auto;margin-top:3px;">
+          <span>
+            <strong style="font-family:var(--font-mono);font-size:12px;color:var(--accent);">replace</strong>
+            <span class="text-dim" style="display:block;font-size:12px;">Overwrite quantities of existing lots with the CSV values</span>
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;">
+      import
+    </button>
+  </form>
+</div>
+
+<div class="card" style="max-width:600px;margin-top:20px;">
+  <h3 style="font-size:13px;margin-bottom:12px;">Supported Formats</h3>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+    <div>
+      <div style="font-family:var(--font-mono);font-size:12px;color:var(--accent);margin-bottom:4px;">ManaBox</div>
+      <div style="font-size:12px;color:var(--text-dim);">Exports with Language and Purchased Price columns. Cost basis is imported automatically.</div>
+    </div>
+    <div>
+      <div style="font-family:var(--font-mono);font-size:12px;color:var(--accent);margin-bottom:4px;">CardSphere</div>
+      <div style="font-size:12px;color:var(--text-dim);">Standard CSV with Scryfall ID. Rows without a Scryfall ID (sealed product) are skipped.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const fileName = document.getElementById('file-name');
+const formatDetected = document.getElementById('format-detected');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => {
+  e.preventDefault();
+  dropZone.style.borderColor = 'var(--accent)';
+});
+dropZone.addEventListener('dragleave', () => {
+  dropZone.style.borderColor = 'var(--border)';
+});
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.style.borderColor = 'var(--border)';
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+
+function handleFile(file) {
+  // Transfer to input
+  const dt = new DataTransfer();
+  dt.items.add(file);
+  fileInput.files = dt.files;
+
+  fileName.textContent = file.name;
+
+  // Try to detect format from first line
+  const reader = new FileReader();
+  reader.onload = e => {
+    const firstLine = e.target.result.split('\n')[0] || '';
+    const lower = firstLine.toLowerCase();
+    let fmt = 'unknown';
+    if (lower.includes('language')) fmt = 'ManaBox';
+    else if (lower.includes('scryfall id') || lower.includes('scryfall_id')) fmt = 'CardSphere / Generic';
+
+    formatDetected.style.display = 'block';
+    formatDetected.innerHTML = `<span style="font-family:var(--font-mono);font-size:11px;color:var(--success);">&#10003; detected: ${fmt}</span>`;
+  };
+  reader.readAsText(file.slice(0, 512));
+}
+</script>
+{% endblock %}

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block title %}{{ card.name }} — card-vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1 class="mono" style="font-size:16px;">{{ card.id }}</h1>
+  <div style="display:flex;gap:8px;">
+    <a href="/individuals/{{ card.id }}/qr" class="btn btn-secondary" target="_blank">QR label</a>
+    <a href="/individuals" class="btn btn-secondary">← back</a>
+  </div>
+</div>
+
+<div class="grid-2" style="gap:24px;">
+  <!-- Left: Card info -->
+  <div>
+    <div class="card" style="margin-bottom:16px;">
+      <div style="display:flex;gap:16px;align-items:flex-start;">
+        {% if card.image_uri %}
+        <img src="{{ card.image_uri }}" alt="{{ card.name }}" style="width:140px;border-radius:6px;flex-shrink:0;">
+        {% endif %}
+        <div style="flex:1;">
+          <h2 style="font-size:16px;margin-bottom:4px;">{{ card.name }}</h2>
+          {% if card.set_name %}
+          <div class="text-dim" style="font-size:12px;margin-bottom:8px;">{{ card.set_name }}{% if card.set_code %} · <span class="mono">{{ card.set_code | upper }}</span>{% endif %}{% if card.collector_number %} #{{ card.collector_number }}{% endif %}</div>
+          {% endif %}
+          {% if card.type_line %}
+          <div style="font-size:12px;color:var(--text-dim);margin-bottom:4px;">{{ card.type_line }}</div>
+          {% endif %}
+          {% if card.mana_cost %}
+          <div class="mono" style="font-size:12px;margin-bottom:8px;">{{ card.mana_cost }}</div>
+          {% endif %}
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+            <span class="badge badge-{{ card.condition | lower }}">{{ card.condition }}</span>
+            {% if card.foil %}<span class="badge badge-foil">foil</span>{% endif %}
+            {% if card.rarity %}<span class="badge" style="background:var(--surface2);color:var(--text-dim);">{{ card.rarity }}</span>{% endif %}
+          </div>
+          {% if card.price_usd or card.price_usd_foil %}
+          <div class="mono" style="font-size:13px;">
+            {% if card.foil and card.price_usd_foil %}
+            <span style="color:var(--accent);">${{ "%.2f"|format(card.price_usd_foil) }}</span> <span class="text-dim">foil</span>
+            {% elif card.price_usd %}
+            <span style="color:var(--accent);">${{ "%.2f"|format(card.price_usd) }}</span>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    <div class="card" style="margin-bottom:16px;">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:12px;">Status</h3>
+      {% set status_class = card.status | replace("_","-") %}
+      <span class="badge badge-{{ status_class }}" style="font-size:13px;padding:4px 12px;">{{ card.status | replace("_"," ") }}</span>
+      <form method="POST" action="/individuals/{{ card.id }}/status" style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+        {% for s in ["in_stock","listed","out_for_grading","graded","sold"] %}
+        <button type="submit" name="status" value="{{ s }}" class="btn btn-secondary" style="font-size:11px;padding:3px 10px;{% if card.status == s %}border-color:var(--accent);color:var(--accent);{% endif %}">
+          {{ s | replace("_"," ") }}
+        </button>
+        {% endfor %}
+      </form>
+    </div>
+
+    <!-- Location -->
+    <div class="card" style="margin-bottom:16px;">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:12px;">Location</h3>
+      <div class="text-dim" style="margin-bottom:8px;font-size:13px;">
+        {% if card.location_name %}{{ card.location_name }}{% else %}Not assigned{% endif %}
+      </div>
+      <form method="POST" action="/individuals/{{ card.id }}/location" style="display:flex;gap:8px;">
+        <select name="location_id" style="flex:1;">
+          <option value="">— none —</option>
+          {% for loc in locations %}
+          <option value="{{ loc.id }}" {% if card.location_id == loc.id %}selected{% endif %}>{{ loc.name }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-secondary" style="flex-shrink:0;">save</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Right: Scans & meta -->
+  <div>
+    <!-- Scans -->
+    <div class="card" style="margin-bottom:16px;">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:12px;">Scans</h3>
+      <div class="grid-2" style="gap:12px;margin-bottom:12px;">
+        <div>
+          <div class="text-dim" style="font-size:11px;font-family:var(--font-mono);margin-bottom:6px;">FRONT</div>
+          {% if card.scan_front_path %}
+          <img src="/{{ card.scan_front_path }}" alt="Front scan" style="width:100%;border-radius:4px;border:1px solid var(--border);">
+          {% else %}
+          <div style="background:var(--surface2);border:1px dashed var(--border);border-radius:4px;height:120px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:12px;">no scan</div>
+          {% endif %}
+        </div>
+        <div>
+          <div class="text-dim" style="font-size:11px;font-family:var(--font-mono);margin-bottom:6px;">BACK</div>
+          {% if card.scan_back_path %}
+          <img src="/{{ card.scan_back_path }}" alt="Back scan" style="width:100%;border-radius:4px;border:1px solid var(--border);">
+          {% else %}
+          <div style="background:var(--surface2);border:1px dashed var(--border);border-radius:4px;height:120px;display:flex;align-items:center;justify-content:center;color:var(--text-dim);font-size:12px;">no scan</div>
+          {% endif %}
+        </div>
+      </div>
+      <form method="POST" action="/individuals/{{ card.id }}/scans" enctype="multipart/form-data">
+        <div class="grid-2" style="gap:10px;margin-bottom:10px;">
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Front</label>
+            <input type="file" name="front" accept="image/*" style="font-size:12px;">
+          </div>
+          <div class="form-group" style="margin-bottom:0;">
+            <label>Back</label>
+            <input type="file" name="back" accept="image/*" style="font-size:12px;">
+          </div>
+        </div>
+        <button type="submit" class="btn btn-secondary" style="width:100%;justify-content:center;">upload scans</button>
+      </form>
+    </div>
+
+    <!-- Meta -->
+    <div class="card">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:12px;">Details</h3>
+      <dl style="display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:13px;">
+        <dt class="text-dim mono" style="font-size:11px;">lot_id</dt>
+        <dd>{% if card.lot_id %}<a href="/inventory">{{ card.lot_id }}</a>{% else %}—{% endif %}</dd>
+        <dt class="text-dim mono" style="font-size:11px;">cost_basis</dt>
+        <dd>{% if card.cost_basis_cents %}${{ "%.2f"|format(card.cost_basis_cents / 100) }}{% else %}—{% endif %}</dd>
+        <dt class="text-dim mono" style="font-size:11px;">created</dt>
+        <dd class="mono" style="font-size:11px;">{{ card.created_at }}</dd>
+        <dt class="text-dim mono" style="font-size:11px;">updated</dt>
+        <dd class="mono" style="font-size:11px;">{{ card.updated_at }}</dd>
+        {% if card.notes %}
+        <dt class="text-dim mono" style="font-size:11px;">notes</dt>
+        <dd>{{ card.notes }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+</div>
+{% endblock %}

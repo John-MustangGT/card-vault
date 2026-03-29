@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}{{ location.name }} — card-vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>{{ location.name }}</h1>
+  <div style="display:flex;gap:8px;">
+    {% if is_empty %}
+    <form method="POST" action="/locations/{{ location.id }}/delete" onsubmit="return confirm('Delete this location?')">
+      <button type="submit" class="btn btn-danger">delete</button>
+    </form>
+    {% endif %}
+    <a href="/locations" class="btn btn-secondary">← back</a>
+  </div>
+</div>
+
+<div class="grid-2" style="gap:24px;">
+  <!-- Edit form -->
+  <div>
+    <div class="card">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:16px;">Edit Location</h3>
+      <form method="POST" action="/locations/{{ location.id }}">
+        <div class="form-group">
+          <label>Name</label>
+          <input type="text" name="name" value="{{ location.name }}" required>
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select name="type" required>
+            {% for t in ["binder","box","other"] %}
+            <option value="{{ t }}" {% if location.type == t %}selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Description</label>
+          <textarea name="description" rows="3">{{ location.description }}</textarea>
+        </div>
+        <button type="submit" class="btn btn-primary">save changes</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Cards here -->
+  <div>
+    {% if lots %}
+    <div class="card" style="margin-bottom:16px;">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:12px;">
+        Inventory Lots ({{ lots | length }})
+      </h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Set</th>
+            <th>Cond</th>
+            <th>Qty</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for lot in lots %}
+          <tr>
+            <td>{{ lot.name }}</td>
+            <td class="mono text-dim" style="font-size:11px;">{{ lot.set_code }}</td>
+            <td>
+              <span class="badge badge-{{ lot.condition | lower }}">{{ lot.condition }}</span>
+              {% if lot.foil %}<span class="badge badge-foil" style="margin-left:2px;">foil</span>{% endif %}
+            </td>
+            <td class="mono">{{ lot.quantity }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if individuals %}
+    <div class="card">
+      <h3 style="font-size:12px;text-transform:uppercase;letter-spacing:0.08em;color:var(--text-dim);margin-bottom:12px;">
+        Individual Cards ({{ individuals | length }})
+      </h3>
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Cond</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for card in individuals %}
+          <tr>
+            <td class="mono" style="font-size:11px;color:var(--accent);">
+              <a href="/individuals/{{ card.id }}">{{ card.id }}</a>
+            </td>
+            <td>{{ card.name }}</td>
+            <td>
+              <span class="badge badge-{{ card.condition | lower }}">{{ card.condition }}</span>
+              {% if card.foil %}<span class="badge badge-foil" style="margin-left:2px;">foil</span>{% endif %}
+            </td>
+            <td>
+              {% set status_class = card.status | replace("_","-") %}
+              <span class="badge badge-{{ status_class }}">{{ card.status | replace("_"," ") }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {% if not lots and not individuals %}
+    <div class="card">
+      <p class="text-dim" style="text-align:center;padding:20px;">No cards stored here yet.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

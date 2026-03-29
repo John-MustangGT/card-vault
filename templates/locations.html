@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Locations — card-vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>storage locations</h1>
+  <a href="/locations/new" class="btn btn-primary">+ new location</a>
+</div>
+
+<div style="overflow-x:auto;">
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Type</th>
+        <th>Description</th>
+        <th>Lots</th>
+        <th>Individuals</th>
+        <th>Created</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for loc in locations %}
+      <tr>
+        <td>
+          <a href="/locations/{{ loc.id }}" style="font-weight:500;">{{ loc.name }}</a>
+        </td>
+        <td>
+          <span class="badge" style="background:var(--surface2);color:var(--text-dim);">{{ loc.type }}</span>
+        </td>
+        <td class="text-dim" style="font-size:12px;">{{ loc.description }}</td>
+        <td class="mono">{{ loc.lot_count }}</td>
+        <td class="mono">{{ loc.individual_count }}</td>
+        <td class="text-dim mono" style="font-size:11px;">{{ loc.created_at | truncate(10, true, "") }}</td>
+        <td>
+          <a href="/locations/{{ loc.id }}" class="btn btn-secondary" style="font-size:11px;padding:3px 8px;">edit</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="7" style="text-align:center;color:var(--text-dim);padding:40px;">
+          No locations yet. <a href="/locations/new">Create one</a> to organize your collection.
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

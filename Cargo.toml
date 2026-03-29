@@ -1,0 +1,32 @@
+[package]
+name = "card-vault"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "card-vault"
+path = "src/main.rs"
+
+[dependencies]
+axum = { version = "0.7", features = ["multipart", "macros"] }
+sqlx = { version = "0.7", features = ["sqlite", "runtime-tokio-rustls", "macros"] }
+tokio = { version = "1", features = ["full"] }
+minijinja = { version = "2", features = ["loader"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+csv = "1"
+dotenvy = "0.15"
+tower-http = { version = "0.5", features = ["fs", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+rand = "0.8"
+reqwest = { version = "0.12", features = ["json"] }
+qrcode = "0.13"
+image = "0.25"
+base64 = "0.22"
+chrono = { version = "0.4", features = ["serde"] }
+tower = "0.4"
+tokio-util = "0.7"
+uuid = { version = "1", features = ["v4"] }
+bytes = "1"

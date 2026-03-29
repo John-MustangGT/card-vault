@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}New Individual — card-vault{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>new individual card</h1>
+  <a href="/individuals" class="btn btn-secondary">← back</a>
+</div>
+
+<div class="card" style="max-width:500px;">
+  <form method="POST" action="/individuals">
+    {% if lot %}
+    <input type="hidden" name="lot_id" value="{{ lot.id }}">
+    <input type="hidden" name="scryfall_id" value="{{ lot.scryfall_id }}">
+    <div class="alert alert-info" style="margin-bottom:16px;">
+      Promoting from lot: <strong>{{ lot.name }}</strong>
+      {% if lot.set_code %}({{ lot.set_code | upper }}){% endif %}
+      — {{ lot.quantity }} in stock
+    </div>
+    <div class="form-group">
+      <label>Condition</label>
+      <select name="condition">
+        {% for cond in ["NM","LP","MP","HP","DMG","PLD"] %}
+        <option value="{{ cond }}" {% if lot.condition == cond %}selected{% endif %}>{{ cond }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Foil</label>
+      <select name="foil">
+        <option value="0" {% if not lot.foil %}selected{% endif %}>Non-foil</option>
+        <option value="1" {% if lot.foil %}selected{% endif %}>Foil</option>
+      </select>
+    </div>
+    {% else %}
+    <div class="form-group">
+      <label>Scryfall ID</label>
+      <input type="text" name="scryfall_id" required placeholder="e.g. d5a5dc1c-…">
+    </div>
+    <div class="form-group">
+      <label>Condition</label>
+      <select name="condition">
+        {% for cond in ["NM","LP","MP","HP","DMG","PLD"] %}
+        <option value="{{ cond }}">{{ cond }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="form-group">
+      <label>Foil</label>
+      <select name="foil">
+        <option value="0">Non-foil</option>
+        <option value="1">Foil</option>
+      </select>
+    </div>
+    {% endif %}
+
+    <div class="form-group">
+      <label>Cost Basis (cents)</label>
+      <input type="number" name="cost_basis_cents" placeholder="e.g. 500 = $5.00">
+    </div>
+
+    <div class="form-group">
+      <label>Location</label>
+      <select name="location_id">
+        <option value="">— none —</option>
+        {% for loc in locations %}
+        <option value="{{ loc.id }}">{{ loc.name }} ({{ loc.type }})</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea name="notes" rows="3" placeholder="Optional notes…"></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;">
+      create individual card
+    </button>
+  </form>
+</div>
+{% endblock %}
