@@ -315,13 +315,24 @@ pub async fn post_individual_scans(
         .map_err(|e| AppError::BadRequest(format!("Multipart error: {e}")))?
     {
         let field_name = field.name().unwrap_or("").to_string();
+        // Only accept "front" and "back" fields
+        if field_name != "front" && field_name != "back" {
+            continue;
+        }
+
         let filename = field.file_name()
             .map(|s| s.to_string())
-            .unwrap_or_else(|| format!("{field_name}.bin"));
+            .unwrap_or_else(|| format!("{field_name}.jpg"));
+        // Sanitize extension: only allow simple alphanumeric extensions
         let ext = std::path::Path::new(&filename)
             .extension()
             .and_then(|e| e.to_str())
             .unwrap_or("jpg");
+        let ext: String = ext.chars()
+            .filter(|c| c.is_ascii_alphanumeric())
+            .take(6)
+            .collect();
+        let ext = if ext.is_empty() { "jpg".to_string() } else { ext };
 
         let data = field.bytes().await
             .map_err(|e| AppError::BadRequest(format!("Failed to read scan: {e}")))?;
