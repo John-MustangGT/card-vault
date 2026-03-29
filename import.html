@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Vault — Import</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:        #0d0f11;
+            --surface:   #151820;
+            --border:    #252a35;
+            --accent:    #4a9eff;
+            --accent-dim:#1e3a5f;
+            --success:   #2ea44f;
+            --error:     #cf4444;
+            --text:      #c9d1d9;
+            --text-dim:  #6e7681;
+            --mono:      'IBM Plex Mono', monospace;
+            --sans:      'IBM Plex Sans', sans-serif;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--sans);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Nav */
+        nav {
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            height: 52px;
+        }
+
+        .nav-brand {
+            font-family: var(--mono);
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--accent);
+            letter-spacing: 0.05em;
+            text-decoration: none;
+        }
+
+        .nav-links { display: flex; gap: 0; }
+
+        .nav-link {
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            text-decoration: none;
+            padding: 0 1rem;
+            height: 52px;
+            display: flex;
+            align-items: center;
+            border-bottom: 2px solid transparent;
+            transition: color 0.15s, border-color 0.15s;
+            font-family: var(--mono);
+            letter-spacing: 0.03em;
+        }
+
+        .nav-link:hover { color: var(--text); }
+        .nav-link.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        /* Main layout */
+        main {
+            flex: 1;
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 3rem 1rem;
+        }
+
+        .import-container {
+            width: 100%;
+            max-width: 640px;
+        }
+
+        .page-header {
+            margin-bottom: 2rem;
+        }
+
+        .page-header h1 {
+            font-family: var(--mono);
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: 0.05em;
+            margin-bottom: 0.4rem;
+        }
+
+        .page-header p {
+            font-size: 0.85rem;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        /* Upload card */
+        .upload-card {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 2rem;
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--border);
+            border-radius: 4px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: border-color 0.2s, background 0.2s;
+            position: relative;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
+            border-color: var(--accent);
+            background: rgba(74, 158, 255, 0.04);
+        }
+
+        .drop-zone input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+            height: 100%;
+        }
+
+        .drop-icon {
+            font-size: 2rem;
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+
+        .drop-zone h3 {
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text);
+            margin-bottom: 0.4rem;
+        }
+
+        .drop-zone p {
+            font-size: 0.78rem;
+            color: var(--text-dim);
+        }
+
+        .file-selected {
+            display: none;
+            margin-top: 1rem;
+            padding: 0.6rem 0.75rem;
+            background: var(--accent-dim);
+            border: 1px solid var(--accent);
+            border-radius: 4px;
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: var(--accent);
+        }
+
+        .import-options {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid var(--border);
+        }
+
+        .option-label {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.75rem;
+            display: block;
+        }
+
+        .radio-group {
+            display: flex;
+            gap: 0.75rem;
+        }
+
+        .radio-option {
+            flex: 1;
+            position: relative;
+        }
+
+        .radio-option input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+        }
+
+        .radio-option label {
+            display: block;
+            padding: 0.6rem 0.75rem;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            cursor: pointer;
+            transition: all 0.15s;
+            text-align: center;
+        }
+
+        .radio-option input:checked + label {
+            border-color: var(--accent);
+            color: var(--accent);
+            background: var(--accent-dim);
+        }
+
+        .submit-row {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.25rem;
+            background: var(--accent);
+            color: #000;
+            border: none;
+            border-radius: 4px;
+            font-family: var(--mono);
+            font-size: 0.82rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.15s;
+            letter-spacing: 0.03em;
+        }
+
+        .btn:hover { opacity: 0.85; }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--text-dim);
+            border: 1px solid var(--border);
+        }
+
+        .btn-secondary:hover { color: var(--text); border-color: var(--text-dim); }
+
+        /* Result panel (returned by server) */
+        .import-result {
+            padding: 1.5rem;
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .import-result.success { border-color: var(--success); background: rgba(46, 164, 79, 0.06); }
+        .import-result.error   { border-color: var(--error);   background: rgba(207, 68, 68, 0.06); }
+
+        .result-message {
+            font-family: var(--mono);
+            font-size: 0.85rem;
+            margin-bottom: 1rem;
+        }
+
+        .error-list {
+            margin: 1rem 0;
+            padding: 0.75rem;
+            background: rgba(207, 68, 68, 0.08);
+            border-radius: 4px;
+        }
+
+        .error-list h4 {
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--error);
+            margin-bottom: 0.5rem;
+        }
+
+        .error-list ul {
+            list-style: none;
+            font-family: var(--mono);
+            font-size: 0.75rem;
+            color: var(--text-dim);
+        }
+
+        .error-list li { padding: 0.15rem 0; }
+
+        .result-actions {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 1rem;
+        }
+
+        /* Loading state */
+        .loading { display: none; }
+        .uploading .loading { display: inline; }
+        .uploading .idle   { display: none; }
+
+        /* Format hint */
+        .format-hint {
+            margin-top: 1rem;
+            padding: 0.75rem;
+            background: rgba(255,255,255,0.02);
+            border-radius: 4px;
+            border: 1px solid var(--border);
+        }
+
+        .format-hint code {
+            font-family: var(--mono);
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            display: block;
+            white-space: nowrap;
+            overflow-x: auto;
+        }
+
+        .format-hint-label {
+            font-family: var(--mono);
+            font-size: 0.68rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            margin-bottom: 0.4rem;
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" class="nav-brand">CARD-VAULT</a>
+        <div class="nav-links">
+            <a href="/import" class="nav-link active">Import</a>
+            <a href="/inventory" class="nav-link">Inventory</a>
+            <a href="/individuals" class="nav-link">Singles</a>
+            <a href="/locations" class="nav-link">Locations</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="import-container">
+            <div class="page-header">
+                <h1>// import collection</h1>
+                <p>Upload a ManaBox CSV export to populate your inventory. Re-importing is safe — quantities accumulate on conflict.</p>
+            </div>
+
+            <div class="upload-card">
+                <form id="import-form"
+                      action="/import"
+                      method="post"
+                      enctype="multipart/form-data">
+
+                    <div class="drop-zone" id="drop-zone">
+                        <input type="file"
+                               name="csv_file"
+                               id="csv-input"
+                               accept=".csv,text/csv"
+                               required>
+                        <span class="drop-icon">📂</span>
+                        <h3>Drop ManaBox CSV here</h3>
+                        <p>or click to browse</p>
+                    </div>
+
+                    <div class="file-selected" id="file-selected"></div>
+
+                    <div class="import-options">
+                        <span class="option-label">On duplicate lot</span>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" name="conflict" id="conflict-add" value="add" checked>
+                                <label for="conflict-add">Add quantities</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" name="conflict" id="conflict-replace" value="replace">
+                                <label for="conflict-replace">Replace quantities</label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="submit-row">
+                        <button type="submit" class="btn" id="submit-btn">
+                            <span class="idle">Import CSV</span>
+                            <span class="loading">Importing…</span>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="format-hint">
+                    <div class="format-hint-label">Expected columns</div>
+                    <code>Name, Set code, Set name, Collector number, Foil, Rarity, Quantity, ManaBox ID, Scryfall ID, Purchase price, Misprint, Altered, Condition, Language, Purchase price currency</code>
+                </div>
+            </div>
+
+            <div id="result-container"></div>
+        </div>
+    </main>
+
+    <script>
+        const dropZone  = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('csv-input');
+        const fileLabel = document.getElementById('file-selected');
+        const form      = document.getElementById('import-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const resultContainer = document.getElementById('result-container');
+
+        // Drag-and-drop styling
+        dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+        dropZone.addEventListener('drop', e => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                showFileName(e.dataTransfer.files[0].name);
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length) showFileName(fileInput.files[0].name);
+        });
+
+        function showFileName(name) {
+            fileLabel.style.display = 'block';
+            fileLabel.textContent = `📄 ${name}`;
+        }
+
+        // HTMX-style submit via fetch
+        form.addEventListener('submit', async e => {
+            e.preventDefault();
+            submitBtn.disabled = true;
+            submitBtn.closest('form').classList.add('uploading');
+
+            const data = new FormData(form);
+            try {
+                const resp = await fetch('/import', { method: 'POST', body: data });
+                const html = await resp.text();
+                resultContainer.innerHTML = html;
+                resultContainer.scrollIntoView({ behavior: 'smooth' });
+            } catch (err) {
+                resultContainer.innerHTML = `<div class="import-result error"><p class="result-message">Network error: ${err.message}</p></div>`;
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.closest('form').classList.remove('uploading');
+            }
+        });
+    </script>
+</body>
+</html>
