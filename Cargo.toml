@@ -19,7 +19,6 @@ sqlx = { version = "0.7", features = ["runtime-tokio", "sqlite", "migrate", "chr
 
 # Templating
 minijinja = { version = "1", features = ["loader"] }
-minijinja-autoescape = "1"
 
 # Serialization
 serde = { version = "1", features = ["derive"] }
