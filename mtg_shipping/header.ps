@@ -1,0 +1,62 @@
+%!PS-Adobe-3.0
+/inch { 72 mul } def
+/DrawOutlines false def   
+/DrawStampGuide false def
+/LeftMargin 0.1875 inch def
+/TopMargin 0.5 inch def
+/LabelWidth 4.0 inch def
+/LabelHeight 2.0 inch def
+/HorizGap 0.125 inch def
+/PageHeight 11 inch def
+/InternalMargin 0.2 inch def
+
+/FitShow {
+    /fs exch def /mw exch def /str exch def
+    gsave
+    /Helvetica findfont fs scalefont setfont
+    str stringwidth pop /sw exch def
+    sw mw gt {
+        /ratio mw sw div def
+        /newfs fs ratio mul def
+        ratio 0.8 lt {
+            gsave 1 0 0 setrgbcolor /Helvetica-Bold findfont fs scalefont setfont
+            -12 0 moveto (!) show grestore
+        } if
+        /Helvetica findfont newfs scalefont setfont
+    } if
+    str show grestore
+} def
+
+/GetXY {
+    /idx exch def /row idx 2 idiv def /col idx 2 mod def
+    /X col LabelWidth HorizGap add mul LeftMargin add def
+    /Y PageHeight TopMargin sub row 1 add LabelHeight mul sub def
+    X Y
+} def
+
+/L {
+    /dt exch def /oid exch def /csz exch def /addr exch def /name exch def /idx exch def
+    gsave
+    idx GetXY translate
+    DrawOutlines { gsave 0.8 setgray 0.25 setlinewidth 0 0 LabelWidth LabelHeight rectstroke grestore } if
+    DrawStampGuide {
+        gsave 0.5 setgray [2 2] 0 setdash 0.25 setlinewidth
+        LabelWidth 0.1 inch add LabelHeight 0.1 inch add moveto
+        1.5 inch 0 rlineto 0 1.2 inch rlineto -1.5 inch 0 rlineto closepath stroke grestore
+    } if
+    InternalMargin InternalMargin translate
+    1 0 0 setrgbcolor /Helvetica-Bold findfont 14 scalefont setfont
+    0 115 moveto (NON-MACHINABLE) show
+    0 0 0 setrgbcolor /Helvetica-Bold findfont 10 scalefont setfont
+    0 102 moveto (DO NOT BEND - FRAGILE) show
+    /Helvetica findfont 7.5 scalefont setfont
+    0 85 moveto (John Orthoefer  |  25 Apple d'Or Road  |  Framingham MA 01701) show
+    /Helvetica-Bold findfont 10 scalefont setfont 0 58 moveto (SHIP TO:) show
+    /MaxW 3.4 inch def
+    15 42 moveto name MaxW 12 FitShow
+    15 28 moveto addr MaxW 12 FitShow
+    15 14 moveto csz  MaxW 12 FitShow
+    /Helvetica findfont 6 scalefont setfont
+    2.2 inch 0 moveto (ID: ) show oid show (  |  ) show dt show
+    grestore
+} def

@@ -1,0 +1,16 @@
+.TH MTG-LABELER 1 "2026-03-27" "v1.0" "MTG Shipping Utility"
+.SH NAME
+mtg-labeler \- Avery 15246 PostScript/PDF generator
+.SH SYNOPSIS
+.B mtg-labeler
+[\fIfile\fR] [\fB\-\-pdf\fR] [\fB\-\-output\fR \fIfile\fR] [\fB\-\-validate\fR]
+.SH OPTIONS
+.TP
+.B \-\-pdf
+Convert output to PDF via ps2pdf.
+.TP
+.B \-\-output [filename]
+Save to file instead of stdout. Appends .ps or .pdf automatically.
+.TP
+.B \-\-force
+Ignore cache and hit API (if validating), but do not save results.
