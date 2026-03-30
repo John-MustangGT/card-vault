@@ -8,6 +8,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use minijinja::Environment;
 use sqlx::SqlitePool;
 use std::{net::SocketAddr, sync::Arc};
 use tower_http::{services::ServeDir, trace::TraceLayer};
@@ -18,6 +19,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 pub struct AppState {
     pub pool: SqlitePool,
     pub config: config::Config,
+    pub env: Arc<Environment<'static>>,
 }
 
 #[tokio::main]
@@ -38,15 +40,21 @@ async fn main() -> Result<()> {
     let pool = db::init_pool(&config.database_url).await?;
     info!("Database initialized");
 
+    let mut env = Environment::new();
+    env.set_loader(minijinja::path_loader("templates"));
+    let env = Arc::new(env);
+
     let state = Arc::new(AppState {
         pool,
         config: config.clone(),
+        env,
     });
 
     let app = Router::new()
         .route("/", get(|| async { axum::response::Redirect::to("/import") }))
         .route("/import", get(routes::import::import_page))
         .route("/import", post(routes::import::handle_import))
+        .route("/inventory", get(routes::inventory::inventory_page))
         // Static files
         .nest_service("/static", ServeDir::new("static"))
         // Scan image serving
