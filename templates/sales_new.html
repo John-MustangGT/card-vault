@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Vault — New Sale</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:#0d0f11; --surface:#151820; --border:#252a35; --accent:#4a9eff;
+            --accent-dim:#1e3a5f; --error:#cf4444; --text:#c9d1d9; --text-dim:#6e7681;
+            --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+        }
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; }
+        nav { border-bottom:1px solid var(--border); padding:0 2rem; display:flex; align-items:center; gap:2rem; height:52px; }
+        .nav-brand { font-family:var(--mono); font-size:0.9rem; font-weight:600; color:var(--accent); letter-spacing:0.05em; text-decoration:none; }
+        .nav-links { display:flex; }
+        .nav-link { font-size:0.8rem; color:var(--text-dim); text-decoration:none; padding:0 1rem; height:52px; display:flex; align-items:center; border-bottom:2px solid transparent; font-family:var(--mono); }
+        .nav-link:hover { color:var(--text); }
+        .nav-link.active { color:var(--accent); border-bottom-color:var(--accent); }
+        main { padding:2rem; max-width:740px; margin:0 auto; }
+        .breadcrumb { font-family:var(--mono); font-size:0.75rem; color:var(--text-dim); margin-bottom:1.5rem; }
+        .breadcrumb a { color:var(--accent); text-decoration:none; }
+        h1 { font-family:var(--mono); font-size:1.1rem; font-weight:600; letter-spacing:0.05em; margin-bottom:2rem; }
+        .panel { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1.5rem; margin-bottom:1.5rem; }
+        .section-title { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:1rem; }
+        .form-row { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; }
+        .field { display:flex; flex-direction:column; gap:0.35rem; }
+        .field label { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; }
+        .field input, .field select { background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:var(--mono); font-size:0.78rem; padding:0.45rem 0.65rem; outline:none; width:100%; }
+        .field input:focus, .field select:focus { border-color:var(--accent); }
+        .field.grow { flex:1; min-width:160px; }
+        .items-table { width:100%; border-collapse:collapse; margin-bottom:0.75rem; }
+        .items-table th { font-family:var(--mono); font-size:0.7rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; padding:0 0.5rem 0.5rem; text-align:left; }
+        .items-table td { padding:0.3rem 0.5rem; }
+        .items-table input { background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:var(--mono); font-size:0.78rem; padding:0.4rem 0.6rem; width:100%; outline:none; }
+        .items-table input:focus { border-color:var(--accent); }
+        .btn { display:inline-flex; align-items:center; padding:0.5rem 1.1rem; background:var(--accent); color:#000; border:none; border-radius:4px; font-family:var(--mono); font-size:0.78rem; font-weight:600; cursor:pointer; text-decoration:none; }
+        .btn:hover { opacity:0.85; }
+        .btn-ghost { background:transparent; color:var(--text-dim); border:1px solid var(--border); }
+        .btn-ghost:hover { color:var(--text); opacity:1; }
+        .btn-sm { padding:0.3rem 0.65rem; font-size:0.72rem; }
+        .btn-danger { background:transparent; color:var(--error); border:1px solid var(--error); }
+        .btn-danger:hover { background:rgba(207,68,68,0.08); opacity:1; }
+        .actions { display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem; }
+        #error-msg { color:var(--error); font-family:var(--mono); font-size:0.8rem; margin-top:0.75rem; display:none; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" class="nav-brand">CARD-VAULT</a>
+        <div class="nav-links">
+            <a href="/import" class="nav-link">Import</a>
+            <a href="/inventory" class="nav-link">Inventory</a>
+            <a href="/individuals" class="nav-link">Singles</a>
+            <a href="/locations" class="nav-link">Locations</a>
+            <a href="/sales" class="nav-link active">Sales</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="breadcrumb"><a href="/sales">← sales</a></div>
+        <h1>// new sale</h1>
+
+        <!-- Buyer -->
+        <div class="panel">
+            <div class="section-title">Buyer</div>
+            <div class="form-row">
+                <div class="field grow">
+                    <label>Name</label>
+                    <input type="text" id="buyer_name" required placeholder="Jane Smith">
+                </div>
+                <div class="field grow">
+                    <label>Email</label>
+                    <input type="text" id="buyer_email" placeholder="optional">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="field grow">
+                    <label>Street Address</label>
+                    <input type="text" id="buyer_address" placeholder="123 Main St">
+                </div>
+            </div>
+            <div class="form-row">
+                <div class="field grow">
+                    <label>City</label>
+                    <input type="text" id="buyer_city" placeholder="Boston">
+                </div>
+                <div class="field" style="width:80px">
+                    <label>State</label>
+                    <input type="text" id="buyer_state" placeholder="MA" maxlength="2">
+                </div>
+                <div class="field" style="width:110px">
+                    <label>ZIP</label>
+                    <input type="text" id="buyer_zip" placeholder="02110">
+                </div>
+            </div>
+        </div>
+
+        <!-- Order info -->
+        <div class="panel">
+            <div class="section-title">Order</div>
+            <div class="form-row">
+                <div class="field grow">
+                    <label>Platform</label>
+                    <select id="platform">
+                        <option value="">— direct —</option>
+                        <option value="ebay">eBay</option>
+                        <option value="tcgplayer">TCGPlayer</option>
+                        <option value="cardsphere">CardSphere</option>
+                        <option value="direct">Direct</option>
+                    </select>
+                </div>
+                <div class="field grow">
+                    <label>Order ID</label>
+                    <input type="text" id="platform_order_id" placeholder="optional">
+                </div>
+                <div class="field" style="width:130px">
+                    <label>Shipping ($)</label>
+                    <input type="number" id="shipping_cost" step="0.01" min="0" placeholder="0.00">
+                </div>
+            </div>
+        </div>
+
+        <!-- Line items -->
+        <div class="panel">
+            <div class="section-title">Items</div>
+            <table class="items-table">
+                <thead>
+                    <tr>
+                        <th style="width:50%">Description</th>
+                        <th style="width:15%">Qty</th>
+                        <th style="width:20%">Unit Price ($)</th>
+                        <th style="width:15%"></th>
+                    </tr>
+                </thead>
+                <tbody id="items-body">
+                    <tr>
+                        <td><input type="text" placeholder="Card name / lot description"></td>
+                        <td><input type="number" value="1" min="1" step="1"></td>
+                        <td><input type="number" step="0.01" min="0" placeholder="0.00"></td>
+                        <td></td>
+                    </tr>
+                </tbody>
+            </table>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addRow()">+ Add Item</button>
+        </div>
+
+        <div id="error-msg"></div>
+        <div class="actions">
+            <a href="/sales" class="btn btn-ghost">Cancel</a>
+            <button type="button" class="btn" onclick="submitSale()">Create Sale</button>
+        </div>
+    </main>
+
+    <script>
+        function addRow() {
+            const tbody = document.getElementById('items-body');
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" placeholder="Card name / lot description"></td>
+                <td><input type="number" value="1" min="1" step="1"></td>
+                <td><input type="number" step="0.01" min="0" placeholder="0.00"></td>
+                <td><button type="button" class="btn btn-danger btn-sm" onclick="this.closest('tr').remove()">✕</button></td>`;
+            tbody.appendChild(tr);
+        }
+
+        async function submitSale() {
+            const errEl = document.getElementById('error-msg');
+            errEl.style.display = 'none';
+
+            const rows = [...document.querySelectorAll('#items-body tr')];
+            const items = rows.map(r => {
+                const inputs = r.querySelectorAll('input');
+                return {
+                    description: inputs[0].value.trim(),
+                    quantity: parseInt(inputs[1].value) || 1,
+                    unit_price: parseFloat(inputs[2].value) || 0,
+                };
+            }).filter(i => i.description);
+
+            if (!document.getElementById('buyer_name').value.trim()) {
+                errEl.textContent = 'Buyer name is required.';
+                errEl.style.display = 'block';
+                return;
+            }
+            if (items.length === 0) {
+                errEl.textContent = 'Add at least one item.';
+                errEl.style.display = 'block';
+                return;
+            }
+
+            const payload = {
+                buyer_name:        document.getElementById('buyer_name').value.trim(),
+                buyer_email:       document.getElementById('buyer_email').value.trim() || null,
+                buyer_address:     document.getElementById('buyer_address').value.trim() || null,
+                buyer_city:        document.getElementById('buyer_city').value.trim() || null,
+                buyer_state:       document.getElementById('buyer_state').value.trim() || null,
+                buyer_zip:         document.getElementById('buyer_zip').value.trim() || null,
+                platform:          document.getElementById('platform').value || null,
+                platform_order_id: document.getElementById('platform_order_id').value.trim() || null,
+                shipping_cost:     parseFloat(document.getElementById('shipping_cost').value) || null,
+                items,
+            };
+
+            const resp = await fetch('/sales', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+            const json = await resp.json();
+            if (json.ok) {
+                window.location = `/sales/${json.id}`;
+            } else {
+                errEl.textContent = 'Error: ' + json.error;
+                errEl.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>

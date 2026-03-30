@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Vault — {{ card.name }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:        #0d0f11;
+            --surface:   #151820;
+            --border:    #252a35;
+            --accent:    #4a9eff;
+            --accent-dim:#1e3a5f;
+            --success:   #2ea44f;
+            --error:     #cf4444;
+            --text:      #c9d1d9;
+            --text-dim:  #6e7681;
+            --mono:      'IBM Plex Mono', monospace;
+            --sans:      'IBM Plex Sans', sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; }
+        nav {
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            display: flex; align-items: center; gap: 2rem; height: 52px;
+        }
+        .nav-brand { font-family: var(--mono); font-size: 0.9rem; font-weight: 600; color: var(--accent); letter-spacing: 0.05em; text-decoration: none; }
+        .nav-links { display: flex; gap: 0; }
+        .nav-link { font-size: 0.8rem; color: var(--text-dim); text-decoration: none; padding: 0 1rem; height: 52px; display: flex; align-items: center; border-bottom: 2px solid transparent; font-family: var(--mono); letter-spacing: 0.03em; }
+        .nav-link:hover { color: var(--text); }
+        .nav-link.active { color: var(--accent); border-bottom-color: var(--accent); }
+        main { padding: 2rem; max-width: 960px; margin: 0 auto; }
+        .breadcrumb { font-family: var(--mono); font-size: 0.75rem; color: var(--text-dim); margin-bottom: 1.5rem; }
+        .breadcrumb a { color: var(--accent); text-decoration: none; }
+        .card-header { margin-bottom: 2rem; }
+        .card-header h1 { font-family: var(--mono); font-size: 1.2rem; font-weight: 600; margin-bottom: 0.3rem; }
+        .card-meta { font-family: var(--mono); font-size: 0.78rem; color: var(--text-dim); }
+        .section { margin-bottom: 2.5rem; }
+        .section-title { font-family: var(--mono); font-size: 0.75rem; font-weight: 500; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem; }
+        .table-wrap { border: 1px solid var(--border); border-radius: 6px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+        thead { background: var(--surface); border-bottom: 1px solid var(--border); }
+        th { font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; padding: 0.6rem 1rem; text-align: left; white-space: nowrap; }
+        td { padding: 0.55rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        .badge { display: inline-block; padding: 0.15rem 0.45rem; border-radius: 3px; font-family: var(--mono); font-size: 0.68rem; font-weight: 500; }
+        .badge-foil    { background: rgba(74,158,255,0.12); color: var(--accent); border: 1px solid rgba(74,158,255,0.25); }
+        .badge-etched  { background: rgba(255,200,74,0.12); color: #ffc84a; border: 1px solid rgba(255,200,74,0.25); }
+        .badge-in_stock       { background: rgba(46,164,79,0.12); color: #2ea44f; border: 1px solid rgba(46,164,79,0.25); }
+        .badge-listed         { background: rgba(74,158,255,0.12); color: var(--accent); border: 1px solid rgba(74,158,255,0.25); }
+        .badge-out_for_grading { background: rgba(255,200,74,0.12); color: #ffc84a; border: 1px solid rgba(255,200,74,0.25); }
+        .badge-graded         { background: rgba(160,100,255,0.12); color: #a064ff; border: 1px solid rgba(160,100,255,0.25); }
+        .badge-sold           { background: rgba(110,118,129,0.12); color: var(--text-dim); border: 1px solid var(--border); }
+        .empty-state { padding: 2rem 1rem; text-align: center; color: var(--text-dim); font-family: var(--mono); font-size: 0.82rem; }
+        .panel { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.5rem; }
+        .form-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
+        .field { display: flex; flex-direction: column; gap: 0.35rem; }
+        .field label { font-family: var(--mono); font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+        .field input, .field select { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-family: var(--mono); font-size: 0.78rem; padding: 0.45rem 0.65rem; outline: none; }
+        .field input:focus, .field select:focus { border-color: var(--accent); }
+        .btn { display: inline-flex; align-items: center; padding: 0.5rem 1.1rem; background: var(--accent); color: #000; border: none; border-radius: 4px; font-family: var(--mono); font-size: 0.78rem; font-weight: 600; cursor: pointer; text-decoration: none; }
+        .btn:hover { opacity: 0.85; }
+        .btn-sm { padding: 0.3rem 0.6rem; font-size: 0.72rem; }
+        .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+        .btn-ghost:hover { color: var(--text); }
+        .id-chip { font-family: var(--mono); font-size: 0.78rem; font-weight: 600; background: var(--accent-dim); color: var(--accent); padding: 0.2rem 0.5rem; border-radius: 3px; border: 1px solid rgba(74,158,255,0.3); }
+        select.status-select { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 0.72rem; padding: 0.25rem 0.4rem; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" class="nav-brand">CARD-VAULT</a>
+        <div class="nav-links">
+            <a href="/import" class="nav-link">Import</a>
+            <a href="/inventory" class="nav-link active">Inventory</a>
+            <a href="/individuals" class="nav-link">Singles</a>
+            <a href="/locations" class="nav-link">Locations</a>
+            <a href="/sales" class="nav-link">Sales</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="breadcrumb"><a href="/inventory">← inventory</a></div>
+
+        <div class="card-header">
+            <h1>{{ card.name }}</h1>
+            <div class="card-meta">
+                {% if card.set_code %}{{ card.set_code | upper }}{% endif %}
+                {% if card.collector_number %} · #{{ card.collector_number }}{% endif %}
+                {% if card.set_name %} · {{ card.set_name }}{% endif %}
+                · {{ card.language | upper }}
+            </div>
+        </div>
+
+        <!-- Lots -->
+        <div class="section">
+            <div class="section-title">Inventory Lots</div>
+            <div class="table-wrap">
+                {% if lots | length == 0 %}
+                <div class="empty-state">No lots.</div>
+                {% else %}
+                <table>
+                    <thead><tr><th>Condition</th><th>Finish</th><th>Qty</th><th>Cost Basis</th></tr></thead>
+                    <tbody>
+                    {% for lot in lots %}
+                    <tr>
+                        <td style="font-family:var(--mono); font-size:0.78rem">{{ lot.condition }}</td>
+                        <td>
+                            {% if lot.foil == "foil" %}<span class="badge badge-foil">foil</span>
+                            {% elif lot.foil == "etched" %}<span class="badge badge-etched">etched</span>
+                            {% else %}<span style="color:var(--text-dim); font-family:var(--mono); font-size:0.78rem">—</span>{% endif %}
+                        </td>
+                        <td style="font-family:var(--mono); font-weight:600">{{ lot.quantity }}</td>
+                        <td style="font-family:var(--mono); font-size:0.78rem; color:var(--text-dim)">
+                            {% if lot.acquisition_cost %}${{ "%.2f"|format(lot.acquisition_cost) }}{% else %}—{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Singles -->
+        <div class="section">
+            <div class="section-title">Tracked Singles</div>
+            <div class="table-wrap" style="margin-bottom:1rem">
+                {% if individuals | length == 0 %}
+                <div class="empty-state">No singles tracked yet.</div>
+                {% else %}
+                <table>
+                    <thead><tr><th>ID</th><th>Condition</th><th>Finish</th><th>Status</th><th>Location</th><th>Cost</th><th></th></tr></thead>
+                    <tbody>
+                    {% for ind in individuals %}
+                    <tr>
+                        <td><span class="id-chip">{{ ind.id }}</span></td>
+                        <td style="font-family:var(--mono); font-size:0.78rem">{{ ind.condition }}</td>
+                        <td>
+                            {% if ind.foil == "foil" %}<span class="badge badge-foil">foil</span>
+                            {% elif ind.foil == "etched" %}<span class="badge badge-etched">etched</span>
+                            {% else %}<span style="color:var(--text-dim); font-size:0.78rem">—</span>{% endif %}
+                        </td>
+                        <td><span class="badge badge-{{ ind.status }}">{{ ind.status }}</span></td>
+                        <td style="font-family:var(--mono); font-size:0.75rem; color:var(--text-dim)">
+                            {{ ind.location_name or "—" }}
+                        </td>
+                        <td style="font-family:var(--mono); font-size:0.78rem; color:var(--text-dim)">
+                            {% if ind.acquisition_cost %}${{ "%.2f"|format(ind.acquisition_cost) }}{% else %}—{% endif %}
+                        </td>
+                        <td>
+                            <form method="post" action="/individuals/{{ ind.id }}/status" style="display:inline-flex; gap:0.4rem; align-items:center">
+                                <select name="status" class="status-select">
+                                    {% for s in ["in_stock","listed","out_for_grading","graded","sold"] %}
+                                    <option value="{{ s }}" {% if ind.status == s %}selected{% endif %}>{{ s }}</option>
+                                    {% endfor %}
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-ghost">Save</button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+
+            <!-- Track new single -->
+            <div class="panel">
+                <div class="section-title" style="margin-bottom:1rem">Track New Single</div>
+                <form method="post" action="/inventory/card/{{ card.scryfall_id }}/individual">
+                    <div class="form-row">
+                        <div class="field">
+                            <label>Condition</label>
+                            <select name="condition">
+                                {% for c in ["near_mint","lightly_played","moderately_played","heavily_played","damaged"] %}
+                                <option value="{{ c }}">{{ c }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Finish</label>
+                            <select name="foil">
+                                <option value="normal">normal</option>
+                                <option value="foil">foil</option>
+                                <option value="etched">etched</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label>Acquisition Cost ($)</label>
+                            <input type="number" name="acquisition_cost" step="0.01" min="0" placeholder="optional" style="width:130px">
+                        </div>
+                        <div class="field">
+                            <label>Location</label>
+                            <select name="location_id">
+                                <option value="">— none —</option>
+                                {% for loc in locations %}
+                                <option value="{{ loc.id }}">{{ loc.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="field" style="margin-bottom:1rem">
+                        <label>Notes</label>
+                        <input type="text" name="notes" placeholder="optional" style="width:360px">
+                    </div>
+                    <button type="submit" class="btn">Track Single</button>
+                </form>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
