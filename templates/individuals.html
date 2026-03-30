@@ -121,7 +121,7 @@
                     </td>
                     <td><span class="badge badge-{{ ind.status }}">{{ ind.status }}</span></td>
                     <td class="dim">{{ ind.location_name or "—" }}</td>
-                    <td class="dim">{% if ind.acquisition_cost %}${{ "%.2f"|format(ind.acquisition_cost) }}{% else %}—{% endif %}</td>
+                    <td class="dim">{% if ind.acquisition_cost %}${{ (ind.acquisition_cost)|usd }}{% else %}—{% endif %}</td>
                     <td class="dim">{{ ind.notes or "—" }}</td>
                 </tr>
                 {% endfor %}

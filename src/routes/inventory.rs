@@ -1,10 +1,12 @@
 use axum::{
     extract::{Form, Path, Query, State},
     response::{Html, Redirect},
+    Json,
 };
 use serde::Deserialize;
 use sqlx::Row;
 use std::sync::Arc;
+use tracing::{info, warn};
 
 use crate::AppState;
 
@@ -130,6 +132,7 @@ pub async fn card_detail(
 
 #[derive(Deserialize)]
 pub struct NewIndividualForm {
+    pub card_id: Option<String>,
     pub condition: String,
     pub foil: String,
     pub acquisition_cost: Option<f64>,
@@ -143,9 +146,20 @@ pub async fn create_individual(
     Form(form): Form<NewIndividualForm>,
 ) -> Redirect {
     let now = unix_now();
-    // Retry on the tiny chance of ID collision
-    for _ in 0..5 {
-        let id = gen_card_id();
+
+    // Use supplied ID (trimmed, must be 1-6 base62 chars) or generate one
+    let supplied_id = form.card_id
+        .as_deref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .and_then(|s| {
+            let valid = s.len() <= 6 && s.chars().all(|c| c.is_ascii_alphanumeric());
+            if valid { Some(s.to_string()) } else { None }
+        });
+
+    let attempts = if supplied_id.is_some() { 1 } else { 5 };
+    for _ in 0..attempts {
+        let id = supplied_id.clone().unwrap_or_else(gen_card_id);
         let result = sqlx::query(
             "INSERT INTO individual_cards
              (id, scryfall_id, foil, condition, acquisition_cost, location_id, notes, status, created_at, updated_at)
@@ -219,26 +233,30 @@ pub struct InventoryRow {
     pub condition: String,
     pub quantity: i64,
     pub image_uri: Option<String>,
+    pub price_usd: Option<f64>,
 }
 
 async fn fetch_inventory(
     state: &AppState,
     params: &InventoryQuery,
 ) -> Result<Vec<InventoryRow>, sqlx::Error> {
-    let rows = sqlx::query!(
+    let rows = sqlx::query(
         r#"
         SELECT
-            il.id          AS "lot_id!",
-            il.scryfall_id AS scryfall_id,
-            sc.name        AS name,
-            sc.set_code    AS set_code,
-            sc.set_name    AS set_name,
-            sc.collector_number AS collector_number,
-            sc.language    AS language,
-            il.foil        AS foil,
-            il.condition   AS condition,
-            il.quantity    AS quantity,
-            sc.image_uri   AS image_uri
+            il.id          AS lot_id,
+            il.scryfall_id,
+            sc.name,
+            sc.set_code,
+            sc.set_name,
+            sc.collector_number,
+            sc.language,
+            il.foil,
+            il.condition,
+            il.quantity,
+            sc.image_uri,
+            (SELECT price_usd FROM price_history
+             WHERE scryfall_id = il.scryfall_id AND foil = il.foil
+             ORDER BY scraped_at DESC LIMIT 1) AS price_usd
         FROM inventory_lots il
         JOIN scryfall_cards sc ON sc.scryfall_id = il.scryfall_id
         ORDER BY sc.name ASC, il.condition ASC
@@ -248,17 +266,18 @@ async fn fetch_inventory(
     .await?
     .into_iter()
     .map(|r| InventoryRow {
-        lot_id: r.lot_id,
-        scryfall_id: r.scryfall_id,
-        name: r.name,
-        set_code: r.set_code,
-        set_name: r.set_name,
-        collector_number: r.collector_number,
-        language: r.language,
-        foil: r.foil,
-        condition: r.condition,
-        quantity: r.quantity,
-        image_uri: r.image_uri,
+        lot_id: r.get("lot_id"),
+        scryfall_id: r.get("scryfall_id"),
+        name: r.get("name"),
+        set_code: r.get("set_code"),
+        set_name: r.get("set_name"),
+        collector_number: r.get("collector_number"),
+        language: r.get("language"),
+        foil: r.get("foil"),
+        condition: r.get("condition"),
+        quantity: r.get("quantity"),
+        image_uri: r.get("image_uri"),
+        price_usd: r.get("price_usd"),
     })
     .collect::<Vec<_>>();
 
@@ -290,6 +309,98 @@ async fn fetch_inventory(
         .collect();
 
     Ok(rows)
+}
+
+#[derive(serde::Deserialize)]
+struct ScryfallPrices {
+    usd: Option<String>,
+    usd_foil: Option<String>,
+    usd_etched: Option<String>,
+}
+
+#[derive(serde::Deserialize)]
+struct ScryfallCardResponse {
+    prices: ScryfallPrices,
+}
+
+pub async fn refresh_prices(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    let ids = match sqlx::query("SELECT DISTINCT scryfall_id FROM inventory_lots")
+        .fetch_all(&state.pool)
+        .await
+    {
+        Ok(rows) => rows,
+        Err(e) => return Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
+    };
+
+    let client = match reqwest::Client::builder()
+        .user_agent("card-vault/1.0 (collection tracker)")
+        .build()
+    {
+        Ok(c) => c,
+        Err(e) => return Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
+    };
+
+    let now = unix_now();
+    let total = ids.len();
+    let mut updated = 0u32;
+    let mut skipped = 0u32;
+
+    for row in &ids {
+        let scryfall_id: String = row.get("scryfall_id");
+        let url = format!("https://api.scryfall.com/cards/{}", scryfall_id);
+
+        match client.get(&url).send().await {
+            Err(e) => {
+                warn!("Scryfall fetch failed for {}: {}", scryfall_id, e);
+                skipped += 1;
+            }
+            Ok(resp) if !resp.status().is_success() => {
+                warn!("Scryfall {} for {}", resp.status(), scryfall_id);
+                skipped += 1;
+            }
+            Ok(resp) => {
+                match resp.json::<ScryfallCardResponse>().await {
+                    Err(e) => {
+                        warn!("Scryfall parse error for {}: {}", scryfall_id, e);
+                        skipped += 1;
+                    }
+                    Ok(card) => {
+                        let prices = [
+                            ("normal",  card.prices.usd),
+                            ("foil",    card.prices.usd_foil),
+                            ("etched",  card.prices.usd_etched),
+                        ];
+                        for (foil, price_str) in prices {
+                            if let Some(p) = price_str.as_deref().and_then(|s| s.parse::<f64>().ok()) {
+                                let _ = sqlx::query(
+                                    "INSERT INTO price_history (scryfall_id, foil, source, price_usd, scraped_at)
+                                     VALUES (?, ?, 'scryfall', ?, ?)"
+                                )
+                                .bind(&scryfall_id)
+                                .bind(foil)
+                                .bind(p)
+                                .bind(now)
+                                .execute(&state.pool)
+                                .await;
+                            }
+                        }
+                        info!("Prices updated for {}", scryfall_id);
+                        updated += 1;
+                    }
+                }
+            }
+        }
+
+        // Scryfall asks for max 10 req/s
+        tokio::time::sleep(std::time::Duration::from_millis(110)).await;
+    }
+
+    Json(serde_json::json!({
+        "ok": true,
+        "total": total,
+        "updated": updated,
+        "skipped": skipped,
+    }))
 }
 
 fn gen_card_id() -> String {

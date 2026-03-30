@@ -108,7 +108,7 @@
                 <div class="kv">
                     <div class="kv-row"><span class="kv-key">Status</span><span class="kv-val"><span class="badge badge-{{ txn.status }}">{{ txn.status }}</span></span></div>
                     <div class="kv-row"><span class="kv-key">Tracking</span><span class="kv-val">{{ txn.tracking_number or "—" }}</span></div>
-                    <div class="kv-row"><span class="kv-key">Shipping</span><span class="kv-val">${{ "%.2f"|format(txn.shipping_cost) }}</span></div>
+                    <div class="kv-row"><span class="kv-key">Shipping</span><span class="kv-val">${{ (txn.shipping_cost)|usd }}</span></div>
                 </div>
             </div>
         </div>
@@ -131,8 +131,8 @@
                 <tr>
                     <td>{{ item.description or "—" }}</td>
                     <td>{{ item.quantity }}</td>
-                    <td>${{ "%.2f"|format(item.sale_price) }}</td>
-                    <td>${{ "%.2f"|format(item.line_total) }}</td>
+                    <td>${{ (item.sale_price)|usd }}</td>
+                    <td>${{ (item.line_total)|usd }}</td>
                 </tr>
                 {% endfor %}
                 </tbody>
@@ -141,9 +141,9 @@
 
         <div class="totals">
             <div class="totals-block">
-                <div class="totals-row"><span>Subtotal</span><span>${{ "%.2f"|format(subtotal.val) }}</span></div>
-                <div class="totals-row"><span>Shipping</span><span>${{ "%.2f"|format(txn.shipping_cost) }}</span></div>
-                <div class="totals-row grand"><span>Total</span><span>${{ "%.2f"|format(subtotal.val + txn.shipping_cost) }}</span></div>
+                <div class="totals-row"><span>Subtotal</span><span>${{ (subtotal.val)|usd }}</span></div>
+                <div class="totals-row"><span>Shipping</span><span>${{ (txn.shipping_cost)|usd }}</span></div>
+                <div class="totals-row grand"><span>Total</span><span>${{ (subtotal.val + txn.shipping_cost)|usd }}</span></div>
             </div>
         </div>
     </main>

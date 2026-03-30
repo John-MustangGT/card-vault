@@ -1,5 +1,6 @@
 use sqlx::FromRow;
 
+#[allow(dead_code)]
 #[derive(Debug, FromRow)]
 pub struct ScryfallCard {
     pub scryfall_id: String,
@@ -13,6 +14,7 @@ pub struct ScryfallCard {
     pub cached_at: i64,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, FromRow)]
 pub struct InventoryLot {
     pub id: i64,

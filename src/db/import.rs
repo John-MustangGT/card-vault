@@ -1,7 +1,6 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use serde::Deserialize;
 use sqlx::SqlitePool;
-use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{info, warn};
 
@@ -29,8 +28,10 @@ pub struct ManaboxRow {
     #[serde(rename = "Purchase price")]
     pub purchase_price: Option<f64>,
     #[serde(rename = "Misprint")]
+    #[allow(dead_code)]
     pub misprint: Option<String>,
     #[serde(rename = "Altered")]
+    #[allow(dead_code)]
     pub altered: Option<String>,
     #[serde(rename = "Condition")]
     pub condition: String,
@@ -46,6 +47,7 @@ pub struct CardSphereRow {
     #[serde(rename = "Count")]
     pub count: i64,
     #[serde(rename = "Tradelist Count")]
+    #[allow(dead_code)]
     pub tradelist_count: i64,
     #[serde(rename = "Name")]
     pub name: String,
@@ -62,8 +64,10 @@ pub struct CardSphereRow {
     #[serde(rename = "Scryfall ID")]
     pub scryfall_id: Option<String>,
     #[serde(rename = "Cardsphere ID")]
+    #[allow(dead_code)]
     pub cardsphere_id: Option<i64>,
     #[serde(rename = "Last Modified")]
+    #[allow(dead_code)]
     pub last_modified: Option<String>,
 }
 

@@ -86,7 +86,7 @@
                     <td class="mono dim">{{ t.platform or "—" }}</td>
                     <td class="mono dim">{{ t.platform_order_id or "—" }}</td>
                     <td class="mono">{{ t.item_count }}</td>
-                    <td class="mono">${{ "%.2f"|format(t.total) }}</td>
+                    <td class="mono">${{ (t.total)|usd }}</td>
                     <td><span class="badge badge-{{ t.status }}">{{ t.status }}</span></td>
                     <td class="mono dim">{{ t.sold_at }}</td>
                     <td>

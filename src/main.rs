@@ -42,6 +42,7 @@ async fn main() -> Result<()> {
 
     let mut env = Environment::new();
     env.set_loader(minijinja::path_loader("templates"));
+    env.add_filter("usd", |v: f64| -> String { format!("{:.2}", v) });
     let env = Arc::new(env);
 
     let state = Arc::new(AppState {
@@ -55,6 +56,19 @@ async fn main() -> Result<()> {
         .route("/import", get(routes::import::import_page))
         .route("/import", post(routes::import::handle_import))
         .route("/inventory", get(routes::inventory::inventory_page))
+        .route("/inventory/refresh-prices", post(routes::inventory::refresh_prices))
+        .route("/individuals", get(routes::individuals::individuals_page))
+        .route("/inventory/card/:scryfall_id", get(routes::inventory::card_detail))
+        .route("/inventory/card/:scryfall_id/individual", post(routes::inventory::create_individual))
+        .route("/individuals/:id/status", post(routes::inventory::update_individual_status))
+        .route("/locations", get(routes::locations::locations_page))
+        .route("/locations", post(routes::locations::create_location))
+        .route("/locations/:id/delete", post(routes::locations::delete_location))
+        .route("/sales", get(routes::sales::sales_page))
+        .route("/sales", post(routes::sales::create_sale))
+        .route("/sales/new", get(routes::sales::new_sale_page))
+        .route("/sales/:id", get(routes::sales::sale_detail))
+        .route("/sales/:id/label", get(routes::sales::sale_label))
         // Static files
         .nest_service("/static", ServeDir::new("static"))
         // Scan image serving

@@ -82,6 +82,7 @@
             align-items: baseline;
             gap: 1rem;
             margin-bottom: 1.5rem;
+            flex-wrap: wrap;
         }
 
         .page-header h1 {
@@ -95,7 +96,22 @@
             font-family: var(--mono);
             font-size: 0.78rem;
             color: var(--text-dim);
+            flex: 1;
         }
+
+        th.sortable {
+            cursor: pointer;
+            user-select: none;
+        }
+
+        th.sortable:hover { color: var(--text); }
+        th.sort-active { color: var(--accent); }
+
+        .sort-icon { opacity: 0.5; font-size: 0.65rem; }
+        th.sort-active .sort-icon { opacity: 1; }
+
+        .price-cell { color: #2ea44f; font-family: var(--mono); }
+        .price-none { color: var(--text-dim); font-family: var(--mono); }
 
         /* Filter bar */
         .filters {
@@ -244,6 +260,9 @@
         <div class="page-header">
             <h1>// inventory</h1>
             <span class="row-count">{{ rows | length }} lots</span>
+            <button id="refresh-btn" class="btn btn-ghost" onclick="refreshPrices()" style="margin-left:auto">
+                ↻ Refresh Prices
+            </button>
         </div>
 
         <form class="filters" method="get" action="/inventory">
@@ -274,12 +293,13 @@
             <table>
                 <thead>
                     <tr>
-                        <th>Name</th>
-                        <th>Set</th>
-                        <th>Lang</th>
-                        <th>Finish</th>
-                        <th>Condition</th>
-                        <th>Qty</th>
+                        <th class="sortable" onclick="sortTable(0,false)">Name<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable" onclick="sortTable(1,false)">Set<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable" onclick="sortTable(2,false)">Lang<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable" onclick="sortTable(3,false)">Finish<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable" onclick="sortTable(4,false)">Condition<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable" onclick="sortTable(5,true)">Qty<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable" onclick="sortTable(6,true)">Price<span class="sort-icon"> ⇅</span></th>
                     </tr>
                 </thead>
                 <tbody>
@@ -301,7 +321,14 @@
                             {% endif %}
                         </td>
                         <td class="set-info">{{ row.condition }}</td>
-                        <td class="qty">{{ row.quantity }}</td>
+                        <td class="qty" data-val="{{ row.quantity }}">{{ row.quantity }}</td>
+                        <td data-val="{{ row.price_usd or 0 }}">
+                            {% if row.price_usd %}
+                            <span class="price-cell">${{ (row.price_usd)|usd }}</span>
+                            {% else %}
+                            <span class="price-none">—</span>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -309,5 +336,58 @@
             {% endif %}
         </div>
     </main>
+
+    <script>
+        // ── Column sort ──────────────────────────────────────────────
+        let _sortCol = -1, _sortAsc = true;
+
+        function sortTable(col, isNum) {
+            const tbody = document.querySelector('tbody');
+            if (!tbody) return;
+            const rows = [...tbody.querySelectorAll('tr')];
+
+            _sortAsc = (_sortCol === col) ? !_sortAsc : true;
+            _sortCol = col;
+
+            rows.sort((a, b) => {
+                const av = a.cells[col].dataset.val ?? a.cells[col].textContent.trim();
+                const bv = b.cells[col].dataset.val ?? b.cells[col].textContent.trim();
+                const cmp = isNum
+                    ? (parseFloat(av) || 0) - (parseFloat(bv) || 0)
+                    : av.localeCompare(bv);
+                return _sortAsc ? cmp : -cmp;
+            });
+            rows.forEach(r => tbody.appendChild(r));
+
+            document.querySelectorAll('th.sortable').forEach((th, i) => {
+                const icon = th.querySelector('.sort-icon');
+                th.classList.toggle('sort-active', i === col);
+                icon.textContent = (i === col) ? (_sortAsc ? ' ▲' : ' ▼') : ' ⇅';
+            });
+        }
+
+        // ── Price refresh ────────────────────────────────────────────
+        async function refreshPrices() {
+            const btn = document.getElementById('refresh-btn');
+            btn.disabled = true;
+            btn.textContent = 'Fetching…';
+
+            try {
+                const resp = await fetch('/inventory/refresh-prices', { method: 'POST' });
+                const data = await resp.json();
+                if (data.ok) {
+                    btn.textContent = `✓ ${data.updated} / ${data.total} updated`;
+                    setTimeout(() => location.reload(), 1200);
+                } else {
+                    btn.textContent = 'Error — see console';
+                    btn.disabled = false;
+                    console.error(data);
+                }
+            } catch (e) {
+                btn.textContent = 'Network error';
+                btn.disabled = false;
+            }
+        }
+    </script>
 </body>
 </html>
