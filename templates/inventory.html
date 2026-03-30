@@ -236,6 +236,7 @@
             <a href="/inventory" class="nav-link active">Inventory</a>
             <a href="/individuals" class="nav-link">Singles</a>
             <a href="/locations" class="nav-link">Locations</a>
+            <a href="/sales" class="nav-link">Sales</a>
         </div>
     </nav>
 
@@ -283,7 +284,7 @@
                 </thead>
                 <tbody>
                     {% for row in rows %}
-                    <tr>
+                    <tr style="cursor:pointer" onclick="window.location='/inventory/card/{{ row.scryfall_id }}'">
                         <td class="card-name">{{ row.name }}</td>
                         <td class="set-info">
                             {% if row.set_code %}{{ row.set_code | upper }}{% else %}—{% endif %}
