@@ -1,0 +1,10 @@
+[Unit]
+Description=Run get_data script
+
+[Service]
+Type=simple
+ExecStart=/home/john/Repos/card-vault/data/get_data
+
+[Install]
+WantedBy=multi-user.target
+

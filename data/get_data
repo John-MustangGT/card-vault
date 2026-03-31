@@ -1,0 +1,11 @@
+#!/bin/sh
+
+JSON=`curl -s https://api.scryfall.com/bulk-data | jq -r '.data[] | select(.type == "all_cards") | .download_uri'`
+FILE=`basename ${JSON}`
+GZFILE=${FILE}.gz
+
+
+[ ! -e ${GZFILE} ] &&  curl -o - ${JSON} | gzip > ${GZFILE}
+
+exit 0 
+
