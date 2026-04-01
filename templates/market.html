@@ -101,6 +101,8 @@
         .down { color: var(--error);   font-family: var(--mono); }
 
         .empty-state { padding: 2.5rem 1rem; text-align: center; color: var(--text-dim); font-family: var(--mono); font-size: 0.82rem; }
+        th.sortable { cursor: pointer; user-select: none; }
+        th.sortable:hover { color: var(--text); }
 
         /* Import log */
         .import-log { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
@@ -320,13 +322,13 @@
                 <table id="browse-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Set</th>
-                            <th>#</th>
-                            <th>Rarity</th>
-                            <th>USD</th>
-                            <th>Foil</th>
-                            <th>Etched</th>
+                            <th class="sortable" data-key="name"             onclick="browseSort('name')">Name <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-key="set_code"         onclick="browseSort('set_code')">Set <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-key="collector_number" onclick="browseSort('collector_number')"># <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-key="rarity"           onclick="browseSort('rarity')">Rarity <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-key="price_usd"        onclick="browseSort('price_usd')">USD <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-key="price_usd_foil"   onclick="browseSort('price_usd_foil')">Foil <span class="sort-icon">⇅</span></th>
+                            <th class="sortable" data-key="price_usd_etched" onclick="browseSort('price_usd_etched')">Etched <span class="sort-icon">⇅</span></th>
                         </tr>
                     </thead>
                     <tbody id="browse-body">
@@ -375,8 +377,13 @@
             if (ts) el.textContent = fmtTs(ts);
         });
 
-        // Browse price search
+        // Browse price search + sort
         let _searchTimer = null;
+        let _browseCards = [];   // cached result set
+        let _sortKey = 'name';
+        let _sortAsc = true;
+        const RARITY_ORDER = { common:0, uncommon:1, rare:2, mythic:3 };
+
         function debouncedSearch() {
             clearTimeout(_searchTimer);
             _searchTimer = setTimeout(doSearch, 300);
@@ -389,6 +396,7 @@
             const count = document.getElementById('browse-count');
 
             if (!q && !set) {
+                _browseCards = [];
                 body.innerHTML = '<tr><td colspan="7" class="empty-state">Enter a name or select a set to browse prices.</td></tr>';
                 count.textContent = '';
                 return;
@@ -398,27 +406,77 @@
             const url = '/market/search?' + new URLSearchParams({ q, set });
             try {
                 const data = await fetch(url).then(r => r.json());
-                const cards = data.cards || [];
-                count.textContent = cards.length === 50 ? '50 results (showing first 50)' : cards.length + ' results';
-                if (cards.length === 0) {
-                    body.innerHTML = '<tr><td colspan="7" class="empty-state">No cards found.</td></tr>';
-                    return;
-                }
-                const fmt = v => v != null ? '$' + v.toFixed(2) : '<span class="dim">—</span>';
-                const rarityColor = { mythic:'#ff8c00', rare:'#ffd700', uncommon:'#aaa', common:'#666' };
-                body.innerHTML = cards.map(c => `
-                    <tr style="cursor:pointer" onclick="window.location='/inventory/card/${c.scryfall_id}'">
-                        <td>${c.name}</td>
-                        <td><span class="set-badge">${c.set_code.toUpperCase()}</span></td>
-                        <td class="mono dim" style="font-size:0.75rem">${c.collector_number}</td>
-                        <td class="mono" style="font-size:0.72rem; color:${rarityColor[c.rarity]||'var(--text-dim)'}">${c.rarity}</td>
-                        <td class="mono">${fmt(c.price_usd)}</td>
-                        <td class="mono">${fmt(c.price_usd_foil)}</td>
-                        <td class="mono">${fmt(c.price_usd_etched)}</td>
-                    </tr>`).join('');
+                _browseCards = data.cards || [];
+                count.textContent = _browseCards.length === 50 ? '50 results (showing first 50)' : _browseCards.length + ' results';
+                renderBrowse();
             } catch(e) {
                 body.innerHTML = '<tr><td colspan="7" class="empty-state">Search failed.</td></tr>';
             }
+        }
+
+        function browseSort(key) {
+            if (_sortKey === key) {
+                _sortAsc = !_sortAsc;
+            } else {
+                _sortKey = key;
+                _sortAsc = true;
+            }
+            // Update header icons
+            document.querySelectorAll('#browse-table th.sortable').forEach(th => {
+                const icon = th.querySelector('.sort-icon');
+                if (th.dataset.key === key) {
+                    icon.textContent = _sortAsc ? ' ↑' : ' ↓';
+                    th.style.color = 'var(--accent)';
+                } else {
+                    icon.textContent = ' ⇅';
+                    th.style.color = '';
+                }
+            });
+            renderBrowse();
+        }
+
+        function renderBrowse() {
+            const body = document.getElementById('browse-body');
+            if (_browseCards.length === 0) {
+                body.innerHTML = '<tr><td colspan="7" class="empty-state">No cards found.</td></tr>';
+                return;
+            }
+
+            const key = _sortKey;
+            const asc = _sortAsc;
+            const sorted = [..._browseCards].sort((a, b) => {
+                let av = a[key], bv = b[key];
+                // Nulls always last
+                if (av == null && bv == null) return 0;
+                if (av == null) return 1;
+                if (bv == null) return -1;
+                // Collector number: numeric sort
+                if (key === 'collector_number') {
+                    av = parseInt(av, 10) || 0;
+                    bv = parseInt(bv, 10) || 0;
+                }
+                // Rarity: use defined order
+                if (key === 'rarity') {
+                    av = RARITY_ORDER[av] ?? 99;
+                    bv = RARITY_ORDER[bv] ?? 99;
+                }
+                if (av < bv) return asc ? -1 : 1;
+                if (av > bv) return asc ? 1 : -1;
+                return 0;
+            });
+
+            const fmt = v => v != null ? '$' + v.toFixed(2) : '<span class="dim">—</span>';
+            const rarityColor = { mythic:'#ff8c00', rare:'#ffd700', uncommon:'#c0c0c0', common:'var(--text-dim)' };
+            body.innerHTML = sorted.map(c => `
+                <tr style="cursor:pointer" onclick="window.location='/inventory/card/${c.scryfall_id}'">
+                    <td>${c.name}</td>
+                    <td><span class="set-badge">${c.set_code.toUpperCase()}</span></td>
+                    <td class="mono dim" style="font-size:0.75rem">${c.collector_number}</td>
+                    <td class="mono" style="font-size:0.72rem; color:${rarityColor[c.rarity]||'var(--text-dim)'}">${c.rarity}</td>
+                    <td class="mono">${fmt(c.price_usd)}</td>
+                    <td class="mono">${fmt(c.price_usd_foil)}</td>
+                    <td class="mono">${fmt(c.price_usd_etched)}</td>
+                </tr>`).join('');
         }
 
         // Clear all market data
