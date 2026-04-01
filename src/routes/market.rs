@@ -239,3 +239,82 @@ pub async fn trigger_import(State(state): State<Arc<AppState>>) -> Json<serde_js
 
     Json(serde_json::json!({ "ok": true, "message": "Import started in background" }))
 }
+
+/// GET /market/search?q=&set= — JSON price browse, returns up to 50 cards
+#[derive(Debug, Deserialize)]
+pub struct SearchQuery {
+    pub q: Option<String>,
+    pub set: Option<String>,
+}
+
+pub async fn search_prices(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<SearchQuery>,
+) -> Json<serde_json::Value> {
+    let q = params.q.as_deref().unwrap_or("").trim().to_string();
+    let set = params.set.as_deref().unwrap_or("").trim().to_string();
+
+    // Need at least a name fragment or a set to search
+    if q.is_empty() && set.is_empty() {
+        return Json(serde_json::json!({ "cards": [] }));
+    }
+
+    let like_q = format!("%{}%", q);
+
+    let rows = sqlx::query(
+        r#"
+        SELECT bc.scryfall_id, bc.name, bc.set_code, bc.set_name, bc.rarity,
+               bc.type_line, bc.collector_number,
+               bp.price_usd, bp.price_usd_foil, bp.price_usd_etched
+        FROM scryfall_bulk_cards bc
+        LEFT JOIN bulk_prices bp
+            ON bp.scryfall_id = bc.scryfall_id
+            AND bp.import_id = (SELECT MAX(id) FROM scryfall_bulk_imports)
+        WHERE (? = '' OR bc.name LIKE ?)
+          AND (? = '' OR bc.set_code = ?)
+        ORDER BY bc.name, bc.set_code, CAST(bc.collector_number AS INTEGER)
+        LIMIT 50
+        "#,
+    )
+    .bind(&q)
+    .bind(&like_q)
+    .bind(&set)
+    .bind(&set)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
+    let cards: Vec<serde_json::Value> = rows
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "scryfall_id":   r.get::<String, _>("scryfall_id"),
+                "name":          r.get::<String, _>("name"),
+                "set_code":      r.get::<String, _>("set_code"),
+                "set_name":      r.get::<String, _>("set_name"),
+                "rarity":        r.get::<String, _>("rarity"),
+                "type_line":     r.get::<String, _>("type_line"),
+                "collector_number": r.get::<String, _>("collector_number"),
+                "price_usd":     r.get::<Option<f64>, _>("price_usd"),
+                "price_usd_foil":r.get::<Option<f64>, _>("price_usd_foil"),
+                "price_usd_etched": r.get::<Option<f64>, _>("price_usd_etched"),
+            })
+        })
+        .collect();
+
+    Json(serde_json::json!({ "cards": cards }))
+}
+
+/// POST /market/clear — truncate all bulk market tables so files get re-imported
+pub async fn clear_market(State(state): State<Arc<AppState>>) -> Json<serde_json::Value> {
+    let r1 = sqlx::query("DELETE FROM bulk_prices").execute(&state.pool).await;
+    let r2 = sqlx::query("DELETE FROM scryfall_bulk_cards").execute(&state.pool).await;
+    let r3 = sqlx::query("DELETE FROM scryfall_bulk_imports").execute(&state.pool).await;
+
+    if r1.is_err() || r2.is_err() || r3.is_err() {
+        return Json(serde_json::json!({ "ok": false, "error": "Delete failed" }));
+    }
+
+    tracing::info!("market data cleared by user");
+    Json(serde_json::json!({ "ok": true }))
+}

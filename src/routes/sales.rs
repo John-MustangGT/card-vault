@@ -1,10 +1,10 @@
 use axum::{
     extract::{Path, State},
-    response::{Html, IntoResponse, Redirect, Response},
+    response::{Html, IntoResponse, Response},
     Json,
 };
 use axum::http::header;
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use sqlx::Row;
 use std::sync::Arc;
 

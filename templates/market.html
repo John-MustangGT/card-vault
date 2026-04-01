@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Vault — Market</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:        #0d0f11;
+            --surface:   #151820;
+            --border:    #252a35;
+            --accent:    #4a9eff;
+            --accent-dim:#1e3a5f;
+            --success:   #2ea44f;
+            --error:     #cf4444;
+            --warn:      #ffc84a;
+            --text:      #c9d1d9;
+            --text-dim:  #6e7681;
+            --mono:      'IBM Plex Mono', monospace;
+            --sans:      'IBM Plex Sans', sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: var(--bg); color: var(--text); font-family: var(--sans); min-height: 100vh; display: flex; flex-direction: column; }
+
+        nav {
+            border-bottom: 1px solid var(--border);
+            padding: 0 2rem;
+            display: flex; align-items: center; gap: 2rem; height: 52px;
+        }
+        .nav-brand { font-family: var(--mono); font-size: 0.9rem; font-weight: 600; color: var(--accent); letter-spacing: 0.05em; text-decoration: none; }
+        .nav-links { display: flex; gap: 0; }
+        .nav-link { font-size: 0.8rem; color: var(--text-dim); text-decoration: none; padding: 0 1rem; height: 52px; display: flex; align-items: center; border-bottom: 2px solid transparent; transition: color 0.15s, border-color 0.15s; font-family: var(--mono); letter-spacing: 0.03em; }
+        .nav-link:hover { color: var(--text); }
+        .nav-link.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+        main { flex: 1; padding: 2rem; max-width: 1300px; width: 100%; margin: 0 auto; }
+
+        .page-header { display: flex; align-items: baseline; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .page-header h1 { font-family: var(--mono); font-size: 1.1rem; font-weight: 600; letter-spacing: 0.05em; }
+
+        .btn {
+            display: inline-flex; align-items: center;
+            padding: 0.45rem 1rem;
+            background: var(--accent); color: #000;
+            border: none; border-radius: 4px;
+            font-family: var(--mono); font-size: 0.78rem; font-weight: 600;
+            cursor: pointer; text-decoration: none; letter-spacing: 0.03em;
+        }
+        .btn:hover { opacity: 0.85; }
+        .btn-ghost { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+        .btn-ghost:hover { color: var(--text); border-color: var(--text-dim); }
+
+        /* Status strip */
+        .status-strip {
+            display: flex; gap: 1.5rem; flex-wrap: wrap;
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 6px; padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem; align-items: center;
+        }
+        .status-item { display: flex; flex-direction: column; gap: 0.2rem; }
+        .status-label { font-family: var(--mono); font-size: 0.65rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+        .status-value { font-family: var(--mono); font-size: 0.88rem; color: var(--text); }
+        .status-value.green { color: var(--success); }
+        .status-sep { width: 1px; background: var(--border); align-self: stretch; }
+
+        /* Filters */
+        .filters { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+        .filter-input {
+            background: var(--surface); border: 1px solid var(--border);
+            border-radius: 4px; color: var(--text); font-family: var(--mono);
+            font-size: 0.78rem; padding: 0.45rem 0.75rem; outline: none; transition: border-color 0.15s;
+        }
+        .filter-input:focus { border-color: var(--accent); }
+
+        /* 3-column layout */
+        .mover-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+        .full-width { grid-column: 1 / -1; }
+
+        .section-title { font-family: var(--mono); font-size: 0.72rem; font-weight: 500; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.75rem; }
+
+        .table-wrap { border: 1px solid var(--border); border-radius: 6px; overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        thead { background: var(--surface); border-bottom: 1px solid var(--border); }
+        th { font-family: var(--mono); font-size: 0.68rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; padding: 0.55rem 0.85rem; text-align: left; white-space: nowrap; }
+        td { padding: 0.5rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+
+        .mono { font-family: var(--mono); }
+        .dim { color: var(--text-dim); }
+        .set-badge { font-family: var(--mono); font-size: 0.7rem; color: var(--text-dim); background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 0.1rem 0.35rem; }
+
+        .up   { color: var(--success); font-family: var(--mono); }
+        .down { color: var(--error);   font-family: var(--mono); }
+
+        .empty-state { padding: 2.5rem 1rem; text-align: center; color: var(--text-dim); font-family: var(--mono); font-size: 0.82rem; }
+
+        /* Import log */
+        .import-log { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; }
+        .import-log-header { display: flex; align-items: center; justify-content: space-between; padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); }
+        .import-log-title { font-family: var(--mono); font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; }
+        .log-row { display: flex; gap: 1.5rem; padding: 0.5rem 1rem; border-bottom: 1px solid var(--border); font-family: var(--mono); font-size: 0.75rem; }
+        .log-row:last-child { border-bottom: none; }
+        .log-fname { color: var(--text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .log-cards { color: var(--success); min-width: 80px; text-align: right; }
+        .log-time  { color: var(--text-dim); min-width: 80px; text-align: right; }
+        .log-dur   { color: var(--text-dim); min-width: 60px; text-align: right; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" class="nav-brand">CARD-VAULT</a>
+        <div class="nav-links">
+            <a href="/import" class="nav-link">Import</a>
+            <a href="/inventory" class="nav-link">Inventory</a>
+            <a href="/individuals" class="nav-link">Singles</a>
+            <a href="/locations" class="nav-link">Locations</a>
+            <a href="/market" class="nav-link active">Market</a>
+            <a href="/sales" class="nav-link">Sales</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="page-header">
+            <h1>// market</h1>
+            <button id="import-btn" class="btn btn-ghost" onclick="triggerImport()" style="margin-left:auto">
+                ↻ Import Now
+            </button>
+        </div>
+
+        <!-- Import status strip -->
+        {% if imports | length > 0 %}
+        {% set latest = imports[0] %}
+        <div class="status-strip">
+            <div class="status-item">
+                <span class="status-label">Last Import</span>
+                <span class="status-value" id="last-import-ts" data-ts="{{ latest.imported_at }}">{{ latest.imported_at }}</span>
+            </div>
+            <div class="status-sep"></div>
+            <div class="status-item">
+                <span class="status-label">Cards (EN)</span>
+                <span class="status-value green">{{ latest.cards_processed }}</span>
+            </div>
+            <div class="status-sep"></div>
+            <div class="status-item">
+                <span class="status-label">Duration</span>
+                <span class="status-value">{{ latest.duration_secs | f1 }}s</span>
+            </div>
+            <div class="status-sep"></div>
+            <div class="status-item">
+                <span class="status-label">Total Imports</span>
+                <span class="status-value">{{ imports | length }}</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="status-strip">
+            <div class="status-item">
+                <span class="status-label">Status</span>
+                <span class="status-value dim">No data imported yet — click Import Now</span>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Set filter -->
+        <form class="filters" method="get" action="/market">
+            <select class="filter-input" name="set" onchange="this.form.submit()">
+                <option value="">All sets</option>
+                {% for s in sets %}
+                <option value="{{ s.set_code }}" {% if filter_set == s.set_code %}selected{% endif %}>
+                    {{ s.set_code | upper }} — {{ s.set_name }}
+                </option>
+                {% endfor %}
+            </select>
+            {% if filter_set %}
+            <a href="/market" class="btn btn-ghost">Clear</a>
+            {% endif %}
+        </form>
+
+        <!-- Collection movers (full width) -->
+        {% if collection_movers | length > 0 %}
+        <div style="margin-bottom: 1.5rem;">
+            <div class="section-title">Your Collection — Price Movers</div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Set</th>
+                            <th>Finish</th>
+                            <th>Qty</th>
+                            <th>Old Price</th>
+                            <th>New Price</th>
+                            <th>Change</th>
+                            <th>%</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in collection_movers %}
+                        <tr style="cursor:pointer" onclick="window.location='/inventory/card/{{ m.scryfall_id }}'">
+                            <td>{{ m.name }}</td>
+                            <td><span class="set-badge">{{ m.set_code | upper }}</span></td>
+                            <td class="dim mono" style="font-size:0.75rem">{{ m.foil }}</td>
+                            <td class="mono">{{ m.qty }}</td>
+                            <td class="mono dim">${{ (m.price_old)|usd }}</td>
+                            <td class="mono">${{ (m.price_new)|usd }}</td>
+                            <td class="{% if m.delta >= 0 %}up{% else %}down{% endif %}">
+                                {% if m.delta >= 0 %}+{% endif %}${{ (m.delta)|usd }}
+                            </td>
+                            <td class="{% if m.pct >= 0 %}up{% else %}down{% endif %}">
+                                {% if m.pct >= 0 %}+{% endif %}{{ m.pct | f1 }}%
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Risers / Fallers grid -->
+        <div class="mover-grid">
+            <!-- Risers -->
+            <div>
+                <div class="section-title">▲ Top Risers{% if filter_set %} — {{ filter_set | upper }}{% endif %}</div>
+                <div class="table-wrap">
+                    {% if risers | length == 0 %}
+                    <div class="empty-state">
+                        {% if imports | length < 2 %}Need at least 2 imports to compare prices.{% else %}No risers found.{% endif %}
+                    </div>
+                    {% else %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Set</th>
+                                <th>Old</th>
+                                <th>New</th>
+                                <th>Δ</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in risers %}
+                            <tr>
+                                <td>{{ r.name }}</td>
+                                <td><span class="set-badge">{{ r.set_code | upper }}</span></td>
+                                <td class="mono dim">${{ (r.price_old)|usd }}</td>
+                                <td class="mono">${{ (r.price_new)|usd }}</td>
+                                <td class="up">+${{ (r.delta)|usd }}</td>
+                                <td class="up">+{{ r.pct | f1 }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Fallers -->
+            <div>
+                <div class="section-title">▼ Top Fallers{% if filter_set %} — {{ filter_set | upper }}{% endif %}</div>
+                <div class="table-wrap">
+                    {% if fallers | length == 0 %}
+                    <div class="empty-state">
+                        {% if imports | length < 2 %}Need at least 2 imports to compare prices.{% else %}No fallers found.{% endif %}
+                    </div>
+                    {% else %}
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Set</th>
+                                <th>Old</th>
+                                <th>New</th>
+                                <th>Δ</th>
+                                <th>%</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for r in fallers %}
+                            <tr>
+                                <td>{{ r.name }}</td>
+                                <td><span class="set-badge">{{ r.set_code | upper }}</span></td>
+                                <td class="mono dim">${{ (r.price_old)|usd }}</td>
+                                <td class="mono">${{ (r.price_new)|usd }}</td>
+                                <td class="down">-${{ (r.delta * -1)|usd }}</td>
+                                <td class="down">{{ r.pct | f1 }}%</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Browse prices -->
+        <div style="margin-bottom: 1.5rem;">
+            <div class="section-title">Browse Prices</div>
+            <div style="display:flex; gap:0.75rem; margin-bottom:0.75rem; flex-wrap:wrap; align-items:center;">
+                <input id="browse-q" type="text" class="filter-input" placeholder="Card name…"
+                       style="flex:1; min-width:180px; max-width:360px"
+                       oninput="debouncedSearch()">
+                <select id="browse-set" class="filter-input" onchange="doSearch()">
+                    <option value="">All sets</option>
+                    {% for s in sets %}
+                    <option value="{{ s.set_code }}">{{ s.set_code | upper }} — {{ s.set_name }}</option>
+                    {% endfor %}
+                </select>
+                <span id="browse-count" class="dim" style="font-family:var(--mono); font-size:0.75rem;"></span>
+            </div>
+            <div class="table-wrap">
+                <table id="browse-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Set</th>
+                            <th>#</th>
+                            <th>Rarity</th>
+                            <th>USD</th>
+                            <th>Foil</th>
+                            <th>Etched</th>
+                        </tr>
+                    </thead>
+                    <tbody id="browse-body">
+                        <tr><td colspan="7" class="empty-state">Enter a name or select a set to browse prices.</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Import history log -->
+        <div class="import-log">
+            <div class="import-log-header">
+                <span class="import-log-title">Import History</span>
+                <button class="btn btn-ghost" style="font-size:0.72rem; padding:0.3rem 0.75rem; color:var(--error); border-color:var(--error);"
+                        onclick="clearMarket()">Clear All Data</button>
+            </div>
+            {% if imports | length == 0 %}
+            <div class="empty-state">No imports yet.</div>
+            {% else %}
+            {% for imp in imports %}
+            <div class="log-row">
+                <span class="log-fname">{{ imp.filename }}</span>
+                <span class="log-cards">{{ imp.cards_processed }} cards</span>
+                <span class="log-dur">{{ imp.duration_secs | f1 }}s</span>
+                <span class="log-time" data-ts="{{ imp.imported_at }}">{{ imp.imported_at }}</span>
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </main>
+
+    <script>
+        // Format unix timestamps as relative time
+        function fmtTs(ts) {
+            const d = new Date(ts * 1000);
+            const now = Date.now();
+            const diff = (now - d.getTime()) / 1000;
+            if (diff < 60)   return 'just now';
+            if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+            return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+        }
+
+        document.querySelectorAll('[data-ts]').forEach(el => {
+            const ts = parseInt(el.dataset.ts, 10);
+            if (ts) el.textContent = fmtTs(ts);
+        });
+
+        // Browse price search
+        let _searchTimer = null;
+        function debouncedSearch() {
+            clearTimeout(_searchTimer);
+            _searchTimer = setTimeout(doSearch, 300);
+        }
+
+        async function doSearch() {
+            const q   = document.getElementById('browse-q').value.trim();
+            const set = document.getElementById('browse-set').value;
+            const body = document.getElementById('browse-body');
+            const count = document.getElementById('browse-count');
+
+            if (!q && !set) {
+                body.innerHTML = '<tr><td colspan="7" class="empty-state">Enter a name or select a set to browse prices.</td></tr>';
+                count.textContent = '';
+                return;
+            }
+
+            body.innerHTML = '<tr><td colspan="7" class="empty-state">Searching…</td></tr>';
+            const url = '/market/search?' + new URLSearchParams({ q, set });
+            try {
+                const data = await fetch(url).then(r => r.json());
+                const cards = data.cards || [];
+                count.textContent = cards.length === 50 ? '50 results (showing first 50)' : cards.length + ' results';
+                if (cards.length === 0) {
+                    body.innerHTML = '<tr><td colspan="7" class="empty-state">No cards found.</td></tr>';
+                    return;
+                }
+                const fmt = v => v != null ? '$' + v.toFixed(2) : '<span class="dim">—</span>';
+                const rarityColor = { mythic:'#ff8c00', rare:'#ffd700', uncommon:'#aaa', common:'#666' };
+                body.innerHTML = cards.map(c => `
+                    <tr style="cursor:pointer" onclick="window.location='/inventory/card/${c.scryfall_id}'">
+                        <td>${c.name}</td>
+                        <td><span class="set-badge">${c.set_code.toUpperCase()}</span></td>
+                        <td class="mono dim" style="font-size:0.75rem">${c.collector_number}</td>
+                        <td class="mono" style="font-size:0.72rem; color:${rarityColor[c.rarity]||'var(--text-dim)'}">${c.rarity}</td>
+                        <td class="mono">${fmt(c.price_usd)}</td>
+                        <td class="mono">${fmt(c.price_usd_foil)}</td>
+                        <td class="mono">${fmt(c.price_usd_etched)}</td>
+                    </tr>`).join('');
+            } catch(e) {
+                body.innerHTML = '<tr><td colspan="7" class="empty-state">Search failed.</td></tr>';
+            }
+        }
+
+        // Clear all market data
+        async function clearMarket() {
+            if (!confirm('Delete all imported card data and price history? Files will be re-imported on next run.')) return;
+            const r = await fetch('/market/clear', { method: 'POST' });
+            const d = await r.json();
+            if (d.ok) location.reload();
+        }
+
+        // Trigger import
+        async function triggerImport() {
+            const btn = document.getElementById('import-btn');
+            btn.disabled = true;
+            btn.textContent = 'Starting…';
+            try {
+                const resp = await fetch('/market/import', { method: 'POST' });
+                const data = await resp.json();
+                if (data.ok) {
+                    btn.textContent = '✓ Running in background';
+                    // Reload after a moment to show progress
+                    setTimeout(() => location.reload(), 3000);
+                } else {
+                    btn.textContent = 'Error';
+                    btn.disabled = false;
+                }
+            } catch (e) {
+                btn.textContent = 'Network error';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -2,6 +2,7 @@
 /// batch-upserts scryfall_bulk_cards and bulk_prices, skips already-imported files.
 
 use anyhow::{Context, Result};
+use chrono::NaiveDateTime;
 use flate2::read::GzDecoder;
 use serde::Deserialize;
 use sqlx::SqlitePool;
@@ -107,13 +108,19 @@ pub async fn run_import(pool: &SqlitePool, data_dir: &str) -> Result<u32> {
         }
     }
 
-    // Prune old bulk_prices — keep rows belonging to the last 10 imports
+    // Prune price history and import records older than 90 days
+    let cutoff = unix_now() - 90 * 24 * 3600;
     let _ = sqlx::query(
-        "DELETE FROM bulk_prices WHERE import_id NOT IN (
-             SELECT id FROM scryfall_bulk_imports ORDER BY id DESC LIMIT 10)",
+        "DELETE FROM bulk_prices WHERE import_id IN (
+             SELECT id FROM scryfall_bulk_imports WHERE imported_at < ?)",
     )
+    .bind(cutoff)
     .execute(pool)
     .await;
+    let _ = sqlx::query("DELETE FROM scryfall_bulk_imports WHERE imported_at < ?")
+        .bind(cutoff)
+        .execute(pool)
+        .await;
 
     Ok(new_files)
 }
@@ -121,9 +128,9 @@ pub async fn run_import(pool: &SqlitePool, data_dir: &str) -> Result<u32> {
 /// Parse a single .json.gz file and upsert into the DB.
 async fn import_file(pool: &SqlitePool, path: &PathBuf, fname: &str) -> Result<usize> {
     let start = Instant::now();
-    let now = unix_now();
+    let file_ts = filename_timestamp(fname);
 
-    info!("bulk import: starting {}", fname);
+    info!("bulk import: starting {} (data timestamp: {})", fname, file_ts);
 
     // Register import row first (get the import_id)
     let import_id: i64 = sqlx::query_scalar(
@@ -131,7 +138,7 @@ async fn import_file(pool: &SqlitePool, path: &PathBuf, fname: &str) -> Result<u
          VALUES (?, 0, ?, 0) RETURNING id",
     )
     .bind(fname)
-    .bind(now)
+    .bind(file_ts)
     .fetch_one(pool)
     .await
     .context("insert import row")?;
@@ -181,7 +188,7 @@ async fn import_file(pool: &SqlitePool, path: &PathBuf, fname: &str) -> Result<u
             .bind(&card.mana_cost)
             .bind(card.cmc)
             .bind(&image_uri)
-            .bind(now)
+            .bind(file_ts)
             .execute(&mut *tx)
             .await?;
 
@@ -242,4 +249,22 @@ fn unix_now() -> i64 {
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs() as i64
+}
+
+/// Parse the YYYYmmDDHHMMss stamp embedded in filenames like
+/// `all-cards-20260330215212.json.gz` → unix timestamp.
+/// Falls back to current time if no stamp is found.
+fn filename_timestamp(fname: &str) -> i64 {
+    // Find a 14-digit run in the filename
+    let digits: String = fname
+        .chars()
+        .skip_while(|c| !c.is_ascii_digit())
+        .take_while(|c| c.is_ascii_digit())
+        .collect();
+    if digits.len() >= 14 {
+        if let Ok(dt) = NaiveDateTime::parse_from_str(&digits[..14], "%Y%m%d%H%M%S") {
+            return dt.and_utc().timestamp();
+        }
+    }
+    unix_now()
 }
