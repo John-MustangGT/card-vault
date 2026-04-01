@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Vault — Ledger</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:#0d0f11; --surface:#151820; --border:#252a35; --accent:#4a9eff;
+            --accent-dim:#1e3a5f; --error:#cf4444; --success:#2ea44f;
+            --text:#c9d1d9; --text-dim:#6e7681;
+            --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+        }
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; }
+        nav { border-bottom:1px solid var(--border); padding:0 2rem; display:flex; align-items:center; gap:2rem; height:52px; }
+        .nav-brand { font-family:var(--mono); font-size:0.9rem; font-weight:600; color:var(--accent); letter-spacing:0.05em; text-decoration:none; }
+        .nav-links { display:flex; }
+        .nav-link { font-size:0.8rem; color:var(--text-dim); text-decoration:none; padding:0 1rem; height:52px; display:flex; align-items:center; border-bottom:2px solid transparent; font-family:var(--mono); }
+        .nav-link:hover { color:var(--text); }
+        .nav-link.active { color:var(--accent); border-bottom-color:var(--accent); }
+        main { padding:2rem; max-width:1000px; margin:0 auto; }
+        .page-header { display:flex; align-items:baseline; gap:1rem; margin-bottom:1.5rem; }
+        .page-header h1 { font-family:var(--mono); font-size:1.1rem; font-weight:600; letter-spacing:0.05em; }
+
+        /* Summary tiles */
+        .summary-row { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+        .summary-tile { background:var(--surface); border:1px solid var(--border); border-radius:6px;
+                        padding:0.9rem 1.25rem; min-width:140px; }
+        .tile-label { font-family:var(--mono); font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.3rem; }
+        .tile-val   { font-family:var(--mono); font-size:1rem; font-weight:600; }
+        .tile-val.total { color:var(--error); }
+
+        /* Add entry form */
+        .add-panel { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1.25rem 1.5rem; margin-bottom:1.5rem; }
+        .section-title { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:1rem; }
+        .form-row { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end; }
+        .field { display:flex; flex-direction:column; gap:0.3rem; }
+        .field label { font-family:var(--mono); font-size:0.68rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; }
+        .field input, .field select, .field textarea {
+            background:var(--bg); border:1px solid var(--border); border-radius:4px;
+            color:var(--text); font-family:var(--mono); font-size:0.78rem;
+            padding:0.42rem 0.65rem; outline:none;
+        }
+        .field input:focus, .field select:focus { border-color:var(--accent); }
+        .field.grow { flex:1; min-width:140px; }
+        .btn { display:inline-flex; align-items:center; padding:0.45rem 1rem; background:var(--accent); color:#000; border:none; border-radius:4px; font-family:var(--mono); font-size:0.78rem; font-weight:600; cursor:pointer; text-decoration:none; }
+        .btn:hover { opacity:0.85; }
+        .btn-ghost { background:transparent; color:var(--text-dim); border:1px solid var(--border); }
+        .btn-ghost:hover { color:var(--text); }
+        .btn-danger { background:transparent; color:var(--error); border:1px solid transparent; padding:0.2rem 0.4rem; font-size:0.72rem; }
+        .btn-danger:hover { border-color:var(--error); }
+
+        /* Table */
+        .table-wrap { border:1px solid var(--border); border-radius:6px; overflow-x:auto; }
+        table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+        thead { background:var(--surface); border-bottom:1px solid var(--border); }
+        th { font-family:var(--mono); font-size:0.68rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; padding:0.55rem 0.9rem; text-align:left; white-space:nowrap; }
+        td { padding:0.5rem 0.9rem; border-bottom:1px solid var(--border); vertical-align:middle; }
+        tr:last-child td { border-bottom:none; }
+        tr:hover td { background:rgba(255,255,255,0.02); }
+        .mono { font-family:var(--mono); }
+        .dim  { color:var(--text-dim); }
+        .amount { font-family:var(--mono); color:var(--error); }
+        .empty-state { padding:3rem; text-align:center; font-family:var(--mono); font-size:0.82rem; color:var(--text-dim); }
+
+        /* Category badges */
+        .cat { display:inline-block; padding:0.12rem 0.4rem; border-radius:3px; font-family:var(--mono); font-size:0.68rem; font-weight:500; }
+        .cat-postage  { background:rgba(74,158,255,0.12); color:var(--accent); border:1px solid rgba(74,158,255,0.25); }
+        .cat-supplies { background:rgba(46,164,79,0.12); color:var(--success); border:1px solid rgba(46,164,79,0.25); }
+        .cat-mileage  { background:rgba(255,200,74,0.12); color:#ffc84a; border:1px solid rgba(255,200,74,0.25); }
+        .cat-fees     { background:rgba(160,100,255,0.12); color:#a064ff; border:1px solid rgba(160,100,255,0.25); }
+        .cat-other    { background:rgba(110,118,129,0.12); color:var(--text-dim); border:1px solid var(--border); }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" class="nav-brand">CARD-VAULT</a>
+        <div class="nav-links">
+            <a href="/import" class="nav-link">Import</a>
+            <a href="/inventory" class="nav-link">Inventory</a>
+            <a href="/individuals" class="nav-link">Singles</a>
+            <a href="/locations" class="nav-link">Locations</a>
+            <a href="/market" class="nav-link">Market</a>
+            <a href="/ledger" class="nav-link active">Ledger</a>
+            <a href="/sales" class="nav-link">Sales</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="page-header">
+            <h1>// ledger</h1>
+        </div>
+
+        <!-- Summary tiles -->
+        <div class="summary-row">
+            <div class="summary-tile">
+                <div class="tile-label">Total Expenses</div>
+                <div class="tile-val total">${{ (grand_total)|usd }}</div>
+            </div>
+            {% for c in by_category %}
+            <div class="summary-tile">
+                <div class="tile-label">{{ c.category }}</div>
+                <div class="tile-val">${{ (c.total)|usd }}</div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Add entry -->
+        <div class="add-panel">
+            <div class="section-title">Add Entry</div>
+            <form method="post" action="/ledger">
+                <div class="form-row">
+                    <div class="field" style="width:140px">
+                        <label>Date</label>
+                        <input type="date" name="entry_date" value="{{ today }}" required>
+                    </div>
+                    <div class="field" style="width:140px">
+                        <label>Category</label>
+                        <select name="category" required>
+                            <option value="postage">Postage</option>
+                            <option value="supplies">Supplies</option>
+                            <option value="mileage">Mileage</option>
+                            <option value="fees">Fees</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="field grow">
+                        <label>Description</label>
+                        <input type="text" name="description" required
+                               placeholder="e.g. Top loaders × 100, USPS stamps, Post office run">
+                    </div>
+                    <div class="field" style="width:110px">
+                        <label>Amount ($)</label>
+                        <input type="number" name="amount" step="0.01" min="0.01" required placeholder="0.00">
+                    </div>
+                    <div class="field grow">
+                        <label>Notes</label>
+                        <input type="text" name="notes" placeholder="optional">
+                    </div>
+                    <div class="field" style="justify-content:flex-end">
+                        <button type="submit" class="btn">Add</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Entry list -->
+        <div class="table-wrap">
+            {% if entries | length == 0 %}
+            <div class="empty-state">No entries yet. Track your postage, supplies, and other costs above.</div>
+            {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Category</th>
+                        <th>Description</th>
+                        <th>Amount</th>
+                        <th>Notes</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for e in entries %}
+                <tr>
+                    <td class="mono dim">{{ e.entry_date }}</td>
+                    <td><span class="cat cat-{{ e.category }}">{{ e.category }}</span></td>
+                    <td>{{ e.description }}</td>
+                    <td class="amount">${{ (e.amount)|usd }}</td>
+                    <td class="dim">{{ e.notes or "" }}</td>
+                    <td>
+                        <button class="btn btn-danger" onclick="deleteEntry({{ e.id }}, this)">✕</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+    </main>
+
+    <script>
+        async function deleteEntry(id, btn) {
+            if (!confirm('Delete this entry?')) return;
+            btn.disabled = true;
+            const r = await fetch(`/ledger/${id}/delete`, { method: 'POST' });
+            const d = await r.json();
+            if (d.ok) btn.closest('tr').remove();
+            else btn.disabled = false;
+        }
+    </script>
+</body>
+</html>

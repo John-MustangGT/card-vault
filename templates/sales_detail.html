@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Card Vault — Sale #{{ txn.id }}</title>
+    <title>Card Vault — Invoice {{ txn.invoice_id }}</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
     <style>
@@ -26,6 +26,7 @@
         .breadcrumb a { color:var(--accent); text-decoration:none; }
         .page-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:2rem; }
         h1 { font-family:var(--mono); font-size:1.1rem; font-weight:600; letter-spacing:0.05em; }
+        .inv-sub { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); margin-top:0.25rem; }
         .header-actions { display:flex; gap:0.75rem; }
         .btn { display:inline-flex; align-items:center; padding:0.5rem 1.1rem; background:var(--accent); color:#000; border:none; border-radius:4px; font-family:var(--mono); font-size:0.78rem; font-weight:600; cursor:pointer; text-decoration:none; }
         .btn:hover { opacity:0.85; }
@@ -49,16 +50,18 @@
         td { padding:0.55rem 1rem; border-bottom:1px solid var(--border); font-family:var(--mono); font-size:0.82rem; }
         tr:last-child td { border-bottom:none; }
         .totals { display:flex; justify-content:flex-end; }
-        .totals-block { min-width:260px; }
+        .totals-block { min-width:280px; }
         .totals-row { display:flex; justify-content:space-between; padding:0.35rem 0; font-family:var(--mono); font-size:0.82rem; border-top:1px solid var(--border); }
         .totals-row.grand { font-weight:600; color:var(--accent); font-size:0.9rem; border-top:1px solid var(--accent); margin-top:0.25rem; padding-top:0.5rem; }
-        .invoice-section { display:none; }
+        .not-charged { color:var(--text-dim); font-size:0.75rem; }
         @media print {
-            nav, .breadcrumb, .page-header .header-actions, .invoice-section { display:none !important; }
-            .print-show { display:block !important; }
+            nav, .breadcrumb, .header-actions { display:none !important; }
             body { background:#fff; color:#000; }
-            .panel { border:1px solid #ccc; }
-            .kv-key, .kv-val, td, th { color:#000 !important; }
+            .panel { border:1px solid #ccc; background:#fff; }
+            .kv-key, .kv-val, td, th, .totals-row { color:#000 !important; }
+            .badge { border:1px solid #999; color:#000 !important; background:#eee !important; }
+            h1, .inv-sub { color:#000 !important; }
+            .not-charged { color:#666 !important; }
         }
     </style>
 </head>
@@ -71,6 +74,7 @@
             <a href="/individuals" class="nav-link">Singles</a>
             <a href="/locations" class="nav-link">Locations</a>
             <a href="/market" class="nav-link">Market</a>
+            <a href="/ledger" class="nav-link">Ledger</a>
             <a href="/sales" class="nav-link active">Sales</a>
         </div>
     </nav>
@@ -80,10 +84,10 @@
 
         <div class="page-header">
             <div>
-                <h1>// sale #{{ txn.id }}</h1>
-                <div style="margin-top:0.4rem">
+                <h1>// invoice {{ txn.invoice_id }}</h1>
+                <div class="inv-sub">
                     <span class="badge badge-{{ txn.status }}">{{ txn.status }}</span>
-                    {% if txn.platform %}<span style="font-family:var(--mono); font-size:0.75rem; color:var(--text-dim); margin-left:0.75rem">{{ txn.platform }}{% if txn.platform_order_id %} · {{ txn.platform_order_id }}{% endif %}</span>{% endif %}
+                    {% if txn.platform %}<span style="margin-left:0.75rem">{{ txn.platform }}{% if txn.platform_order_id %} · {{ txn.platform_order_id }}{% endif %}</span>{% endif %}
                 </div>
             </div>
             <div class="header-actions">
@@ -107,9 +111,23 @@
             <div class="panel">
                 <div class="section-title">Shipping</div>
                 <div class="kv">
-                    <div class="kv-row"><span class="kv-key">Status</span><span class="kv-val"><span class="badge badge-{{ txn.status }}">{{ txn.status }}</span></span></div>
-                    <div class="kv-row"><span class="kv-key">Tracking</span><span class="kv-val">{{ txn.tracking_number or "—" }}</span></div>
-                    <div class="kv-row"><span class="kv-key">Shipping</span><span class="kv-val">${{ (txn.shipping_cost)|usd }}</span></div>
+                    <div class="kv-row">
+                        <span class="kv-key">Status</span>
+                        <span class="kv-val"><span class="badge badge-{{ txn.status }}">{{ txn.status }}</span></span>
+                    </div>
+                    <div class="kv-row">
+                        <span class="kv-key">Tracking</span>
+                        <span class="kv-val">{{ txn.tracking_number or "—" }}</span>
+                    </div>
+                    <div class="kv-row">
+                        <span class="kv-key">Postage</span>
+                        <span class="kv-val">
+                            ${{ (txn.shipping_cost)|usd }}
+                            {% if not txn.shipping_charged %}
+                            <span class="not-charged">(not charged to buyer)</span>
+                            {% endif %}
+                        </span>
+                    </div>
                 </div>
             </div>
         </div>
@@ -143,8 +161,27 @@
         <div class="totals">
             <div class="totals-block">
                 <div class="totals-row"><span>Subtotal</span><span>${{ (subtotal.val)|usd }}</span></div>
-                <div class="totals-row"><span>Shipping</span><span>${{ (txn.shipping_cost)|usd }}</span></div>
-                <div class="totals-row grand"><span>Total</span><span>${{ (subtotal.val + txn.shipping_cost)|usd }}</span></div>
+                {% if txn.shipping_cost > 0 %}
+                <div class="totals-row">
+                    <span>
+                        Postage
+                        {% if not txn.shipping_charged %}<span class="not-charged">(not charged)</span>{% endif %}
+                    </span>
+                    <span {% if not txn.shipping_charged %}class="not-charged"{% endif %}>
+                        ${{ (txn.shipping_cost)|usd }}
+                    </span>
+                </div>
+                {% endif %}
+                <div class="totals-row grand">
+                    <span>Total</span>
+                    <span>
+                        {% if txn.shipping_charged %}
+                            ${{ (subtotal.val + txn.shipping_cost)|usd }}
+                        {% else %}
+                            ${{ (subtotal.val)|usd }}
+                        {% endif %}
+                    </span>
+                </div>
             </div>
         </div>
     </main>

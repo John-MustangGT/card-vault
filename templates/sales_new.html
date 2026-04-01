@@ -57,6 +57,7 @@
             <a href="/individuals" class="nav-link">Singles</a>
             <a href="/locations" class="nav-link">Locations</a>
             <a href="/market" class="nav-link">Market</a>
+            <a href="/ledger" class="nav-link">Ledger</a>
             <a href="/sales" class="nav-link active">Sales</a>
         </div>
     </nav>
@@ -118,9 +119,23 @@
                     <label>Order ID</label>
                     <input type="text" id="platform_order_id" placeholder="optional">
                 </div>
-                <div class="field" style="width:130px">
-                    <label>Shipping ($)</label>
+            </div>
+            <div class="form-row">
+                <div class="field" style="width:150px">
+                    <label>Postage Cost ($)</label>
                     <input type="number" id="shipping_cost" step="0.01" min="0" placeholder="0.00">
+                </div>
+                <div class="field" style="justify-content:flex-end; padding-bottom:0.1rem">
+                    <label style="margin-bottom:0.5rem">Charged to Buyer</label>
+                    <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.82rem; color:var(--text)">
+                        <input type="checkbox" id="shipping_charged" checked
+                               style="width:auto; accent-color:var(--accent)">
+                        Charge shipping on invoice
+                    </label>
+                </div>
+                <div class="field grow">
+                    <label>Tracking Number</label>
+                    <input type="text" id="tracking_number" placeholder="optional — add after shipping">
                 </div>
             </div>
         </div>
@@ -203,6 +218,8 @@
                 platform:          document.getElementById('platform').value || null,
                 platform_order_id: document.getElementById('platform_order_id').value.trim() || null,
                 shipping_cost:     parseFloat(document.getElementById('shipping_cost').value) || null,
+                shipping_charged:  document.getElementById('shipping_charged').checked,
+                tracking_number:   document.getElementById('tracking_number').value.trim() || null,
                 items,
             };
 

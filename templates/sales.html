@@ -51,6 +51,7 @@
             <a href="/individuals" class="nav-link">Singles</a>
             <a href="/locations" class="nav-link">Locations</a>
             <a href="/market" class="nav-link">Market</a>
+            <a href="/ledger" class="nav-link">Ledger</a>
             <a href="/sales" class="nav-link active">Sales</a>
         </div>
     </nav>
@@ -68,7 +69,7 @@
             <table>
                 <thead>
                     <tr>
-                        <th>#</th>
+                        <th>Invoice</th>
                         <th>Buyer</th>
                         <th>Platform</th>
                         <th>Order ID</th>
@@ -82,7 +83,7 @@
                 <tbody>
                 {% for t in transactions %}
                 <tr>
-                    <td class="mono dim">{{ t.id }}</td>
+                    <td class="mono dim">{{ t.invoice_id }}</td>
                     <td>{{ t.buyer_name or "—" }}</td>
                     <td class="mono dim">{{ t.platform or "—" }}</td>
                     <td class="mono dim">{{ t.platform_order_id or "—" }}</td>
