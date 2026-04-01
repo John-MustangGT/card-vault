@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     response::{Html, IntoResponse, Response},
     Json,
 };
@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 use crate::AppState;
 
-// ── Invoice ID: YYYYMMDD-mmm (minutes since midnight) ───────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 fn gen_invoice_id() -> String {
     let now = Local::now();
@@ -27,7 +27,56 @@ fn unix_now() -> i64 {
         .as_secs() as i64
 }
 
-// ── Sales list ───────────────────────────────────────────────────────────────
+// ── Inventory autocomplete ────────────────────────────────────────────────────
+
+#[derive(Deserialize)]
+pub struct AutocompleteQuery {
+    pub q: Option<String>,
+}
+
+pub async fn inventory_autocomplete(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<AutocompleteQuery>,
+) -> Json<serde_json::Value> {
+    let q = params.q.as_deref().unwrap_or("").trim().to_string();
+    if q.len() < 2 {
+        return Json(serde_json::json!({ "results": [] }));
+    }
+    let like_q = format!("%{}%", q);
+
+    let rows = sqlx::query(
+        r#"SELECT sc.name, sc.set_code, sc.set_name, il.condition, il.foil,
+                  SUM(il.quantity) as qty
+           FROM inventory_lots il
+           JOIN scryfall_cards sc ON sc.scryfall_id = il.scryfall_id
+           WHERE sc.name LIKE ?
+           GROUP BY sc.scryfall_id, il.condition, il.foil
+           ORDER BY sc.name, il.condition
+           LIMIT 20"#,
+    )
+    .bind(&like_q)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
+    let results: Vec<serde_json::Value> = rows
+        .iter()
+        .map(|r| {
+            serde_json::json!({
+                "name":      r.get::<String, _>("name"),
+                "set_code":  r.get::<String, _>("set_code"),
+                "set_name":  r.get::<String, _>("set_name"),
+                "condition": r.get::<String, _>("condition"),
+                "foil":      r.get::<String, _>("foil"),
+                "qty":       r.get::<i64, _>("qty"),
+            })
+        })
+        .collect();
+
+    Json(serde_json::json!({ "results": results }))
+}
+
+// ── Sales list ────────────────────────────────────────────────────────────────
 
 pub async fn sales_page(State(state): State<Arc<AppState>>) -> Html<String> {
     let rows = sqlx::query(
@@ -76,34 +125,112 @@ pub async fn sales_page(State(state): State<Arc<AppState>>) -> Html<String> {
 pub async fn new_sale_page(State(state): State<Arc<AppState>>) -> Html<String> {
     let tmpl = state
         .env
-        .get_template("sales_new.html")
-        .expect("sales_new.html missing");
-    Html(tmpl.render(minijinja::context!()).expect("template render failed"))
+        .get_template("sales_form.html")
+        .expect("sales_form.html missing");
+    Html(
+        tmpl.render(minijinja::context! {
+            mode   => "new",
+            prefill => "",
+        })
+        .expect("template render failed"),
+    )
 }
 
-// ── Create sale ───────────────────────────────────────────────────────────────
+// ── Edit sale form ────────────────────────────────────────────────────────────
+
+pub async fn edit_sale_page(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<i64>,
+) -> Html<String> {
+    let txn = sqlx::query(
+        "SELECT id, invoice_id, buyer_name, buyer_email, buyer_address,
+                buyer_city, buyer_state, buyer_zip,
+                platform, platform_order_id, shipping_cost, shipping_charged,
+                tracking_number, status
+         FROM transactions WHERE id = ?",
+    )
+    .bind(id)
+    .fetch_optional(&state.pool)
+    .await
+    .unwrap_or(None);
+
+    let txn = match txn {
+        None => return Html("<p>Not found.</p>".into()),
+        Some(r) => r,
+    };
+
+    let item_rows = sqlx::query(
+        "SELECT description, set_code, condition, quantity, sale_price
+         FROM transaction_items WHERE transaction_id = ?",
+    )
+    .bind(id)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
+    let prefill = serde_json::json!({
+        "id": id,
+        "invoice_id": txn.get::<Option<String>,_>("invoice_id").unwrap_or_default(),
+        "buyer_name": txn.get::<Option<String>,_>("buyer_name").unwrap_or_default(),
+        "buyer_email": txn.get::<Option<String>,_>("buyer_email").unwrap_or_default(),
+        "buyer_address": txn.get::<Option<String>,_>("buyer_address").unwrap_or_default(),
+        "buyer_city": txn.get::<Option<String>,_>("buyer_city").unwrap_or_default(),
+        "buyer_state": txn.get::<Option<String>,_>("buyer_state").unwrap_or_default(),
+        "buyer_zip": txn.get::<Option<String>,_>("buyer_zip").unwrap_or_default(),
+        "platform": txn.get::<Option<String>,_>("platform").unwrap_or_default(),
+        "platform_order_id": txn.get::<Option<String>,_>("platform_order_id").unwrap_or_default(),
+        "shipping_cost": txn.get::<Option<f64>,_>("shipping_cost").unwrap_or(0.0),
+        "shipping_charged": txn.get::<i64,_>("shipping_charged") != 0,
+        "tracking_number": txn.get::<Option<String>,_>("tracking_number").unwrap_or_default(),
+        "items": item_rows.iter().map(|r| serde_json::json!({
+            "description": r.get::<Option<String>,_>("description").unwrap_or_default(),
+            "set_code":    r.get::<Option<String>,_>("set_code").unwrap_or_default(),
+            "condition":   r.get::<Option<String>,_>("condition").unwrap_or_default(),
+            "quantity":    r.get::<i64,_>("quantity"),
+            "unit_price":  r.get::<f64,_>("sale_price"),
+        })).collect::<Vec<_>>(),
+    });
+
+    let prefill_json = serde_json::to_string(&prefill).unwrap_or_default();
+
+    let tmpl = state
+        .env
+        .get_template("sales_form.html")
+        .expect("sales_form.html missing");
+    Html(
+        tmpl.render(minijinja::context! {
+            mode    => "edit",
+            prefill => prefill_json,
+        })
+        .expect("template render failed"),
+    )
+}
+
+// ── Create / Update ───────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
 pub struct SaleItem {
     pub description: String,
-    pub quantity: i64,
-    pub unit_price: f64,
+    pub set_code:    Option<String>,
+    pub condition:   Option<String>,
+    pub quantity:    i64,
+    pub unit_price:  f64,
 }
 
 #[derive(Deserialize)]
 pub struct CreateSaleRequest {
-    pub buyer_name: String,
-    pub buyer_email: Option<String>,
-    pub buyer_address: Option<String>,
-    pub buyer_city: Option<String>,
-    pub buyer_state: Option<String>,
-    pub buyer_zip: Option<String>,
-    pub platform: Option<String>,
+    pub buyer_name:        String,
+    pub buyer_email:       Option<String>,
+    pub buyer_address:     Option<String>,
+    pub buyer_city:        Option<String>,
+    pub buyer_state:       Option<String>,
+    pub buyer_zip:         Option<String>,
+    pub platform:          Option<String>,
     pub platform_order_id: Option<String>,
-    pub shipping_cost: Option<f64>,
-    pub shipping_charged: Option<bool>,
-    pub tracking_number: Option<String>,
-    pub items: Vec<SaleItem>,
+    pub shipping_cost:     Option<f64>,
+    pub shipping_charged:  Option<bool>,
+    pub tracking_number:   Option<String>,
+    pub items:             Vec<SaleItem>,
 }
 
 pub async fn create_sale(
@@ -143,23 +270,71 @@ pub async fn create_sale(
         Err(e) => return Json(serde_json::json!({ "ok": false, "error": e.to_string() })),
     };
 
-    for item in &req.items {
+    insert_items(&state.pool, txn_id, &req.items).await;
+    Json(serde_json::json!({ "ok": true, "id": txn_id }))
+}
+
+pub async fn update_sale(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<i64>,
+    Json(req): Json<CreateSaleRequest>,
+) -> Json<serde_json::Value> {
+    let shipping_charged = req.shipping_charged.unwrap_or(true) as i64;
+
+    let result = sqlx::query(
+        "UPDATE transactions SET
+           buyer_name=?, buyer_email=?, buyer_address=?, buyer_city=?, buyer_state=?, buyer_zip=?,
+           platform=?, platform_order_id=?, shipping_cost=?, shipping_charged=?, tracking_number=?
+         WHERE id=?",
+    )
+    .bind(&req.buyer_name)
+    .bind(&req.buyer_email)
+    .bind(&req.buyer_address)
+    .bind(&req.buyer_city)
+    .bind(&req.buyer_state)
+    .bind(&req.buyer_zip)
+    .bind(&req.platform)
+    .bind(&req.platform_order_id)
+    .bind(req.shipping_cost)
+    .bind(shipping_charged)
+    .bind(&req.tracking_number)
+    .bind(id)
+    .execute(&state.pool)
+    .await;
+
+    if let Err(e) = result {
+        return Json(serde_json::json!({ "ok": false, "error": e.to_string() }));
+    }
+
+    // Replace items
+    let _ = sqlx::query("DELETE FROM transaction_items WHERE transaction_id=?")
+        .bind(id)
+        .execute(&state.pool)
+        .await;
+
+    insert_items(&state.pool, id, &req.items).await;
+    Json(serde_json::json!({ "ok": true, "id": id }))
+}
+
+async fn insert_items(pool: &sqlx::SqlitePool, txn_id: i64, items: &[SaleItem]) {
+    for item in items {
         if item.description.trim().is_empty() {
             continue;
         }
         let _ = sqlx::query(
-            "INSERT INTO transaction_items (transaction_id, description, quantity, sale_price, currency)
-             VALUES (?, ?, ?, ?, 'USD')",
+            "INSERT INTO transaction_items
+             (transaction_id, description, set_code, condition, quantity, sale_price, currency)
+             VALUES (?, ?, ?, ?, ?, ?, 'USD')",
         )
         .bind(txn_id)
         .bind(&item.description)
+        .bind(item.set_code.as_deref().filter(|s| !s.is_empty()))
+        .bind(item.condition.as_deref().filter(|s| !s.is_empty()))
         .bind(item.quantity)
         .bind(item.unit_price)
-        .execute(&state.pool)
+        .execute(pool)
         .await;
     }
-
-    Json(serde_json::json!({ "ok": true, "id": txn_id }))
 }
 
 // ── Sale detail / invoice ─────────────────────────────────────────────────────
@@ -207,7 +382,7 @@ pub async fn sale_detail(
     };
 
     let item_rows = sqlx::query(
-        "SELECT id, description, quantity, sale_price, currency
+        "SELECT id, description, set_code, condition, quantity, sale_price, currency
          FROM transaction_items WHERE transaction_id = ?",
     )
     .bind(id)
@@ -221,12 +396,14 @@ pub async fn sale_detail(
             let qty: i64 = r.get("quantity");
             let price: f64 = r.get("sale_price");
             serde_json::json!({
-                "id": r.get::<i64, _>("id"),
+                "id":          r.get::<i64, _>("id"),
                 "description": r.get::<Option<String>, _>("description").unwrap_or_default(),
-                "quantity": qty,
-                "sale_price": price,
-                "line_total": qty as f64 * price,
-                "currency": r.get::<String, _>("currency"),
+                "set_code":    r.get::<Option<String>, _>("set_code").unwrap_or_default(),
+                "condition":   r.get::<Option<String>, _>("condition").unwrap_or_default(),
+                "quantity":    qty,
+                "sale_price":  price,
+                "line_total":  qty as f64 * price,
+                "currency":    r.get::<String, _>("currency"),
             })
         })
         .collect();
@@ -276,13 +453,10 @@ pub async fn sale_label(
     let disposition = format!("attachment; filename=\"label_{}.txt\"", id);
 
     let mut resp = content.into_response();
-    resp.headers_mut().insert(
-        header::CONTENT_TYPE,
-        "text/plain".parse().unwrap(),
-    );
-    resp.headers_mut().insert(
-        header::CONTENT_DISPOSITION,
-        disposition.parse().unwrap(),
-    );
+    resp.headers_mut()
+        .insert(header::CONTENT_TYPE, "text/plain".parse().unwrap());
+    resp.headers_mut()
+        .insert(header::CONTENT_DISPOSITION, disposition.parse().unwrap());
     resp
 }
+

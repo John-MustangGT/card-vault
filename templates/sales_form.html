@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Vault — {% if mode == "edit" %}Edit Invoice{% else %}New Sale{% endif %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:#0d0f11; --surface:#151820; --border:#252a35; --accent:#4a9eff;
+            --accent-dim:#1e3a5f; --error:#cf4444; --text:#c9d1d9; --text-dim:#6e7681;
+            --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+        }
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; }
+        nav { border-bottom:1px solid var(--border); padding:0 2rem; display:flex; align-items:center; gap:2rem; height:52px; }
+        .nav-brand { font-family:var(--mono); font-size:0.9rem; font-weight:600; color:var(--accent); letter-spacing:0.05em; text-decoration:none; }
+        .nav-links { display:flex; }
+        .nav-link { font-size:0.8rem; color:var(--text-dim); text-decoration:none; padding:0 1rem; height:52px; display:flex; align-items:center; border-bottom:2px solid transparent; font-family:var(--mono); }
+        .nav-link:hover { color:var(--text); }
+        .nav-link.active { color:var(--accent); border-bottom-color:var(--accent); }
+        main { padding:2rem; max-width:860px; margin:0 auto; }
+        .breadcrumb { font-family:var(--mono); font-size:0.75rem; color:var(--text-dim); margin-bottom:1.5rem; }
+        .breadcrumb a { color:var(--accent); text-decoration:none; }
+        h1 { font-family:var(--mono); font-size:1.1rem; font-weight:600; letter-spacing:0.05em; margin-bottom:2rem; }
+        .inv-badge { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); margin-left:1rem; }
+        .panel { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1.5rem; margin-bottom:1.5rem; }
+        .section-title { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:1rem; }
+        .form-row { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1rem; }
+        .field { display:flex; flex-direction:column; gap:0.35rem; }
+        .field label { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; }
+        .field input, .field select { background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:var(--mono); font-size:0.78rem; padding:0.45rem 0.65rem; outline:none; width:100%; }
+        .field input:focus, .field select:focus { border-color:var(--accent); }
+        .field.grow { flex:1; min-width:140px; }
+
+        /* Items table */
+        .items-wrap { overflow-x:auto; }
+        .items-table { width:100%; border-collapse:collapse; margin-bottom:0.75rem; min-width:640px; }
+        .items-table th { font-family:var(--mono); font-size:0.68rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; padding:0 0.45rem 0.5rem; text-align:left; white-space:nowrap; }
+        .items-table td { padding:0.3rem 0.45rem; vertical-align:top; }
+        .items-table input, .items-table select {
+            background:var(--bg); border:1px solid var(--border); border-radius:4px;
+            color:var(--text); font-family:var(--mono); font-size:0.78rem;
+            padding:0.4rem 0.5rem; width:100%; outline:none;
+        }
+        .items-table input:focus, .items-table select:focus { border-color:var(--accent); }
+
+        /* Autocomplete */
+        .ac-wrap { position:relative; }
+        .ac-dropdown {
+            display:none; position:absolute; top:100%; left:0; right:0; z-index:100;
+            background:var(--surface); border:1px solid var(--accent); border-top:none;
+            border-radius:0 0 4px 4px; max-height:220px; overflow-y:auto;
+        }
+        .ac-item {
+            padding:0.45rem 0.65rem; cursor:pointer; font-family:var(--mono); font-size:0.75rem;
+            border-bottom:1px solid var(--border);
+        }
+        .ac-item:last-child { border-bottom:none; }
+        .ac-item:hover, .ac-item.active { background:var(--accent-dim); }
+        .ac-name { color:var(--text); font-weight:500; }
+        .ac-meta { color:var(--text-dim); font-size:0.68rem; margin-top:0.1rem; }
+
+        .btn { display:inline-flex; align-items:center; padding:0.5rem 1.1rem; background:var(--accent); color:#000; border:none; border-radius:4px; font-family:var(--mono); font-size:0.78rem; font-weight:600; cursor:pointer; text-decoration:none; }
+        .btn:hover { opacity:0.85; }
+        .btn-ghost { background:transparent; color:var(--text-dim); border:1px solid var(--border); }
+        .btn-ghost:hover { color:var(--text); opacity:1; }
+        .btn-sm { padding:0.3rem 0.65rem; font-size:0.72rem; }
+        .btn-danger { background:transparent; color:var(--error); border:1px solid var(--error); }
+        .btn-danger:hover { background:rgba(207,68,68,0.08); opacity:1; }
+        .actions { display:flex; gap:0.75rem; justify-content:flex-end; margin-top:1rem; }
+        #error-msg { color:var(--error); font-family:var(--mono); font-size:0.8rem; margin-top:0.75rem; display:none; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" class="nav-brand">CARD-VAULT</a>
+        <div class="nav-links">
+            <a href="/import" class="nav-link">Import</a>
+            <a href="/inventory" class="nav-link">Inventory</a>
+            <a href="/individuals" class="nav-link">Singles</a>
+            <a href="/locations" class="nav-link">Locations</a>
+            <a href="/market" class="nav-link">Market</a>
+            <a href="/ledger" class="nav-link">Ledger</a>
+            <a href="/sales" class="nav-link active">Sales</a>
+        </div>
+    </nav>
+
+    {% if prefill %}<script>var _p = {{ prefill }};</script>{% endif %}
+
+    <main>
+        <div class="breadcrumb"><a href="/sales">← sales</a></div>
+        <h1>
+            {% if mode == "edit" %}// edit invoice<span class="inv-badge" id="inv-id-display"></span>
+            {% else %}// new sale{% endif %}
+        </h1>
+
+        <!-- Buyer -->
+        <div class="panel">
+            <div class="section-title">Buyer</div>
+            <div class="form-row">
+                <div class="field grow"><label>Name</label><input type="text" id="buyer_name" required placeholder="Jane Smith"></div>
+                <div class="field grow"><label>Email</label><input type="text" id="buyer_email" placeholder="optional"></div>
+            </div>
+            <div class="form-row">
+                <div class="field grow"><label>Street Address</label><input type="text" id="buyer_address" placeholder="123 Main St"></div>
+            </div>
+            <div class="form-row">
+                <div class="field grow"><label>City</label><input type="text" id="buyer_city"></div>
+                <div class="field" style="width:80px"><label>State</label><input type="text" id="buyer_state" maxlength="2" placeholder="MA"></div>
+                <div class="field" style="width:110px"><label>ZIP</label><input type="text" id="buyer_zip" placeholder="02110"></div>
+            </div>
+        </div>
+
+        <!-- Order -->
+        <div class="panel">
+            <div class="section-title">Order</div>
+            <div class="form-row">
+                <div class="field grow">
+                    <label>Platform</label>
+                    <select id="platform">
+                        <option value="">— direct —</option>
+                        <option value="ebay">eBay</option>
+                        <option value="tcgplayer">TCGPlayer</option>
+                        <option value="cardsphere">CardSphere</option>
+                        <option value="direct">Direct</option>
+                    </select>
+                </div>
+                <div class="field grow"><label>Order ID</label><input type="text" id="platform_order_id" placeholder="optional"></div>
+            </div>
+            <div class="form-row">
+                <div class="field" style="width:150px">
+                    <label>Postage Cost ($)</label>
+                    <input type="number" id="shipping_cost" step="0.01" min="0" placeholder="0.00">
+                </div>
+                <div class="field" style="justify-content:flex-end; padding-bottom:0.1rem">
+                    <label style="margin-bottom:0.5rem">Charged to Buyer</label>
+                    <label style="display:flex; align-items:center; gap:0.5rem; cursor:pointer; font-size:0.82rem; color:var(--text)">
+                        <input type="checkbox" id="shipping_charged" checked style="width:auto; accent-color:var(--accent)">
+                        Charge shipping on invoice
+                    </label>
+                </div>
+                <div class="field grow"><label>Tracking Number</label><input type="text" id="tracking_number" placeholder="add after shipping"></div>
+            </div>
+        </div>
+
+        <!-- Line items -->
+        <div class="panel">
+            <div class="section-title">Items</div>
+            <div class="items-wrap">
+                <table class="items-table">
+                    <thead>
+                        <tr>
+                            <th style="width:34%">Description</th>
+                            <th style="width:10%">Set</th>
+                            <th style="width:16%">Condition</th>
+                            <th style="width:9%">Qty</th>
+                            <th style="width:13%">Unit Price ($)</th>
+                            <th style="width:8%"></th>
+                        </tr>
+                    </thead>
+                    <tbody id="items-body"></tbody>
+                </table>
+            </div>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="addRow()">+ Add Item</button>
+        </div>
+
+        <div id="error-msg"></div>
+        <div class="actions">
+            <a href="/sales" class="btn btn-ghost">Cancel</a>
+            <button type="button" class="btn" onclick="submitSale()">
+                {% if mode == "edit" %}Save Changes{% else %}Create Sale{% endif %}
+            </button>
+        </div>
+    </main>
+
+    <script>
+        const MODE = '{{ mode }}';
+        const EDIT_ID = (typeof _p !== 'undefined') ? _p.id : null;
+        const CONDITIONS = ['near_mint','lightly_played','moderately_played','heavily_played','damaged'];
+
+        // ── Autocomplete ───────────────────────────────────────────────────────
+        let _acTimer = null;
+        let _acActive = -1;
+
+        function attachAc(descInput, row) {
+            let dropdown = null;
+
+            function getDropdown() {
+                if (!dropdown) {
+                    dropdown = document.createElement('div');
+                    dropdown.className = 'ac-dropdown';
+                    descInput.parentElement.appendChild(dropdown);
+                }
+                return dropdown;
+            }
+
+            descInput.addEventListener('input', () => {
+                clearTimeout(_acTimer);
+                _acTimer = setTimeout(() => fetchAc(descInput, row, getDropdown()), 250);
+            });
+
+            descInput.addEventListener('keydown', e => {
+                const dd = getDropdown();
+                const items = [...dd.querySelectorAll('.ac-item')];
+                if (!items.length) return;
+                if (e.key === 'ArrowDown') { e.preventDefault(); _acActive = Math.min(_acActive + 1, items.length - 1); highlightAc(items); }
+                else if (e.key === 'ArrowUp') { e.preventDefault(); _acActive = Math.max(_acActive - 1, 0); highlightAc(items); }
+                else if (e.key === 'Enter' && _acActive >= 0) { e.preventDefault(); items[_acActive].click(); }
+                else if (e.key === 'Escape') { dd.style.display = 'none'; }
+            });
+
+            descInput.addEventListener('blur', () => setTimeout(() => { if (dropdown) dropdown.style.display = 'none'; }, 150));
+        }
+
+        function highlightAc(items) {
+            items.forEach((el, i) => el.classList.toggle('active', i === _acActive));
+            if (items[_acActive]) items[_acActive].scrollIntoView({ block: 'nearest' });
+        }
+
+        async function fetchAc(input, row, dropdown) {
+            const q = input.value.trim();
+            if (q.length < 2) { dropdown.style.display = 'none'; return; }
+            try {
+                const data = await fetch('/sales/autocomplete?q=' + encodeURIComponent(q)).then(r => r.json());
+                const results = data.results || [];
+                if (!results.length) { dropdown.style.display = 'none'; return; }
+                _acActive = -1;
+                dropdown.innerHTML = results.map((r, i) => `
+                    <div class="ac-item" data-i="${i}">
+                        <div class="ac-name">${r.name}${r.foil !== 'normal' ? ' <span style="color:var(--accent)">(' + r.foil + ')</span>' : ''}</div>
+                        <div class="ac-meta">${r.set_code.toUpperCase()} · ${r.set_name} · ${r.condition.replace(/_/g,' ')} · qty ${r.qty}</div>
+                    </div>`).join('');
+                dropdown.querySelectorAll('.ac-item').forEach((el, i) => {
+                    el.addEventListener('mousedown', e => { e.preventDefault(); applyAc(results[i], input, row, dropdown); });
+                });
+                dropdown.style.display = 'block';
+            } catch(e) { dropdown.style.display = 'none'; }
+        }
+
+        function applyAc(result, input, row, dropdown) {
+            input.value = result.name + (result.foil !== 'normal' ? ` (${result.foil})` : '');
+            const setInput = row.querySelector('.col-set');
+            const condSel  = row.querySelector('.col-cond');
+            if (setInput) setInput.value = result.set_code.toUpperCase();
+            if (condSel)  condSel.value  = result.condition;
+            dropdown.style.display = 'none';
+        }
+
+        // ── Row management ─────────────────────────────────────────────────────
+        function condOptions(selected) {
+            return CONDITIONS.map(c =>
+                `<option value="${c}" ${c === selected ? 'selected' : ''}>${c.replace(/_/g,' ')}</option>`
+            ).join('');
+        }
+
+        function buildRow(desc='', set='', cond='', qty=1, price='', removable=true) {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td class="ac-wrap"><input type="text" class="col-desc" value="${esc(desc)}" placeholder="Card name"></td>
+                <td><input type="text" class="col-set" value="${esc(set)}" placeholder="SET" style="text-transform:uppercase" maxlength="8"></td>
+                <td><select class="col-cond"><option value="">—</option>${condOptions(cond)}</select></td>
+                <td><input type="number" class="col-qty" value="${qty}" min="1" step="1" style="width:56px"></td>
+                <td><input type="number" class="col-price" value="${price}" step="0.01" min="0" placeholder="0.00"></td>
+                <td>${removable ? '<button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">✕</button>' : ''}</td>`;
+            const descInput = tr.querySelector('.col-desc');
+            attachAc(descInput, tr);
+            return tr;
+        }
+
+        function esc(s) { return String(s).replace(/"/g, '&quot;'); }
+
+        function addRow(desc, set, cond, qty, price, removable) {
+            document.getElementById('items-body').appendChild(buildRow(desc, set, cond, qty, price, removable !== false));
+        }
+
+        // ── Pre-populate for edit ──────────────────────────────────────────────
+        window.addEventListener('DOMContentLoaded', () => {
+            if (typeof _p === 'undefined') {
+                addRow(); // blank first row for new sale
+                return;
+            }
+            // Buyer
+            document.getElementById('buyer_name').value      = _p.buyer_name || '';
+            document.getElementById('buyer_email').value     = _p.buyer_email || '';
+            document.getElementById('buyer_address').value   = _p.buyer_address || '';
+            document.getElementById('buyer_city').value      = _p.buyer_city || '';
+            document.getElementById('buyer_state').value     = _p.buyer_state || '';
+            document.getElementById('buyer_zip').value       = _p.buyer_zip || '';
+            // Order
+            document.getElementById('platform').value           = _p.platform || '';
+            document.getElementById('platform_order_id').value  = _p.platform_order_id || '';
+            document.getElementById('shipping_cost').value      = _p.shipping_cost || '';
+            document.getElementById('shipping_charged').checked = _p.shipping_charged !== false;
+            document.getElementById('tracking_number').value    = _p.tracking_number || '';
+            // Invoice badge
+            const badge = document.getElementById('inv-id-display');
+            if (badge && _p.invoice_id) badge.textContent = ' — ' + _p.invoice_id;
+            // Items
+            const items = _p.items || [];
+            if (items.length === 0) { addRow(); return; }
+            items.forEach((item, i) => addRow(item.description, item.set_code, item.condition, item.quantity, item.unit_price, i > 0));
+        });
+
+        // ── Submit ─────────────────────────────────────────────────────────────
+        async function submitSale() {
+            const errEl = document.getElementById('error-msg');
+            errEl.style.display = 'none';
+
+            const rows = [...document.querySelectorAll('#items-body tr')];
+            const items = rows.map(r => ({
+                description: r.querySelector('.col-desc').value.trim(),
+                set_code:    r.querySelector('.col-set').value.trim().toUpperCase() || null,
+                condition:   r.querySelector('.col-cond').value || null,
+                quantity:    parseInt(r.querySelector('.col-qty').value) || 1,
+                unit_price:  parseFloat(r.querySelector('.col-price').value) || 0,
+            })).filter(i => i.description);
+
+            if (!document.getElementById('buyer_name').value.trim()) {
+                errEl.textContent = 'Buyer name is required.'; errEl.style.display = 'block'; return;
+            }
+            if (items.length === 0) {
+                errEl.textContent = 'Add at least one item.'; errEl.style.display = 'block'; return;
+            }
+
+            const payload = {
+                buyer_name:        document.getElementById('buyer_name').value.trim(),
+                buyer_email:       document.getElementById('buyer_email').value.trim() || null,
+                buyer_address:     document.getElementById('buyer_address').value.trim() || null,
+                buyer_city:        document.getElementById('buyer_city').value.trim() || null,
+                buyer_state:       document.getElementById('buyer_state').value.trim() || null,
+                buyer_zip:         document.getElementById('buyer_zip').value.trim() || null,
+                platform:          document.getElementById('platform').value || null,
+                platform_order_id: document.getElementById('platform_order_id').value.trim() || null,
+                shipping_cost:     parseFloat(document.getElementById('shipping_cost').value) || null,
+                shipping_charged:  document.getElementById('shipping_charged').checked,
+                tracking_number:   document.getElementById('tracking_number').value.trim() || null,
+                items,
+            };
+
+            const url  = MODE === 'edit' ? `/sales/${EDIT_ID}/edit` : '/sales';
+            const resp = await fetch(url, { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+            const json = await resp.json();
+            if (json.ok) {
+                window.location = `/sales/${json.id}`;
+            } else {
+                errEl.textContent = 'Error: ' + json.error;
+                errEl.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html>

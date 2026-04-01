@@ -92,6 +92,7 @@
             </div>
             <div class="header-actions">
                 <a href="/sales/{{ txn.id }}/label" class="btn btn-ghost">↓ Label TXT</a>
+                <a href="/sales/{{ txn.id }}/edit" class="btn btn-ghost">Edit</a>
                 <button class="btn btn-ghost" onclick="window.print()">Print Invoice</button>
             </div>
         </div>
@@ -138,6 +139,8 @@
                 <thead>
                     <tr>
                         <th>Description</th>
+                        <th>Set</th>
+                        <th>Condition</th>
                         <th>Qty</th>
                         <th>Unit Price</th>
                         <th>Line Total</th>
@@ -149,6 +152,12 @@
                 {% set subtotal.val = subtotal.val + item.line_total %}
                 <tr>
                     <td>{{ item.description or "—" }}</td>
+                    <td style="font-family:var(--mono); font-size:0.75rem; color:var(--text-dim)">
+                        {% if item.set_code %}{{ item.set_code | upper }}{% else %}—{% endif %}
+                    </td>
+                    <td style="font-family:var(--mono); font-size:0.75rem; color:var(--text-dim)">
+                        {% if item.condition %}{{ item.condition | replace("_", " ") }}{% else %}—{% endif %}
+                    </td>
                     <td>{{ item.quantity }}</td>
                     <td>${{ (item.sale_price)|usd }}</td>
                     <td>${{ (item.line_total)|usd }}</td>

@@ -90,8 +90,11 @@ async fn main() -> Result<()> {
         .route("/market/clear", post(routes::market::clear_market))
         .route("/sales", get(routes::sales::sales_page))
         .route("/sales", post(routes::sales::create_sale))
+        .route("/sales/autocomplete", get(routes::sales::inventory_autocomplete))
         .route("/sales/new", get(routes::sales::new_sale_page))
         .route("/sales/:id", get(routes::sales::sale_detail))
+        .route("/sales/:id/edit", get(routes::sales::edit_sale_page))
+        .route("/sales/:id/edit", post(routes::sales::update_sale))
         .route("/sales/:id/label", get(routes::sales::sale_label))
         // Static files
         .nest_service("/static", ServeDir::new("static"))
