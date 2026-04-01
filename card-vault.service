@@ -1,0 +1,18 @@
+[Unit]
+Description=Card Vault — MTG collection inventory
+After=network.target
+
+[Service]
+Type=simple
+User=john
+WorkingDirectory=/home/john/Repos/card-vault
+EnvironmentFile=/home/john/Repos/card-vault/.env
+ExecStart=/home/john/Repos/card-vault/target/release/card-vault
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=card-vault
+
+[Install]
+WantedBy=multi-user.target

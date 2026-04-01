@@ -18,10 +18,29 @@ impl Config {
             scan_storage_path: std::env::var("SCAN_STORAGE_PATH")
                 .unwrap_or_else(|_| "./scans".into()),
             data_dir: std::env::var("DATA_DIR").unwrap_or_else(|_| "./data".into()),
-            host: std::env::var("HOST").unwrap_or_else(|_| "127.0.0.1".into()),
+            host: resolve_host(
+                &std::env::var("HOST").unwrap_or_else(|_| "localhost".into())
+            ),
             port: std::env::var("PORT")
                 .unwrap_or_else(|_| "3000".into())
                 .parse()?,
         })
+    }
+}
+
+/// Resolve friendly HOST aliases to bind addresses.
+///
+/// | Value       | Binds to    | Accessible from              |
+/// |-------------|-------------|------------------------------|
+/// | `localhost` | 127.0.0.1   | This machine only (default)  |
+/// | `localnet`  | 0.0.0.0     | Any machine on your LAN      |
+/// | `any`       | 0.0.0.0     | Any network (open to WAN)    |
+/// | `<ip>`      | that IP     | Specific interface           |
+fn resolve_host(raw: &str) -> String {
+    match raw.trim().to_lowercase().as_str() {
+        "localhost" => "127.0.0.1".into(),
+        "localnet" | "lan" => "0.0.0.0".into(),
+        "any" | "0.0.0.0" => "0.0.0.0".into(),
+        other => other.to_string(),
     }
 }
