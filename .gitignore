@@ -24,4 +24,9 @@ target
 .env
 Cargo.lock
 card-vault.db
+.claude/
+card-vault.db-shm
+card-vault.db-wal
+data/all-cards-*.json.gz
+migrations/*.sql
 
