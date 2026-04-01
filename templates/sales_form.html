@@ -87,7 +87,7 @@
         </div>
     </nav>
 
-    {% if prefill %}<script>var _p = {{ prefill }};</script>{% endif %}
+    {% if prefill %}<script>var _p = {{ prefill|safe }};</script>{% endif %}
 
     <main>
         <div class="breadcrumb"><a href="/sales">← sales</a></div>
