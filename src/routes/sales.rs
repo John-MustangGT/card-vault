@@ -44,7 +44,8 @@ pub async fn inventory_autocomplete(
     }
     let like_q = format!("%{}%", q);
 
-    let rows = sqlx::query(
+    // Card lots from inventory
+    let card_rows = sqlx::query(
         r#"SELECT sc.name, sc.set_code, sc.set_name, il.condition, il.foil,
                   SUM(il.quantity) as qty
            FROM inventory_lots il
@@ -52,17 +53,28 @@ pub async fn inventory_autocomplete(
            WHERE sc.name LIKE ?
            GROUP BY sc.scryfall_id, il.condition, il.foil
            ORDER BY sc.name, il.condition
-           LIMIT 20"#,
+           LIMIT 15"#,
     )
     .bind(&like_q)
     .fetch_all(&state.pool)
     .await
     .unwrap_or_default();
 
-    let results: Vec<serde_json::Value> = rows
+    // Sealed products
+    let sealed_rows = sqlx::query(
+        "SELECT id, name, set_code, set_name, product_type, language, quantity
+         FROM sealed_products WHERE name LIKE ? AND quantity > 0 ORDER BY name LIMIT 10",
+    )
+    .bind(&like_q)
+    .fetch_all(&state.pool)
+    .await
+    .unwrap_or_default();
+
+    let mut results: Vec<serde_json::Value> = card_rows
         .iter()
         .map(|r| {
             serde_json::json!({
+                "kind":      "card",
                 "name":      r.get::<String, _>("name"),
                 "set_code":  r.get::<String, _>("set_code"),
                 "set_name":  r.get::<String, _>("set_name"),
@@ -72,6 +84,19 @@ pub async fn inventory_autocomplete(
             })
         })
         .collect();
+
+    for r in &sealed_rows {
+        results.push(serde_json::json!({
+            "kind":         "sealed",
+            "sealed_id":    r.get::<i64, _>("id"),
+            "name":         r.get::<String, _>("name"),
+            "set_code":     r.get::<String, _>("set_code"),
+            "set_name":     r.get::<String, _>("set_name"),
+            "product_type": r.get::<String, _>("product_type"),
+            "language":     r.get::<String, _>("language"),
+            "qty":          r.get::<i64, _>("quantity"),
+        }));
+    }
 
     Json(serde_json::json!({ "results": results }))
 }
@@ -215,6 +240,7 @@ pub struct SaleItem {
     pub condition:   Option<String>,
     pub quantity:    i64,
     pub unit_price:  f64,
+    pub sealed_id:   Option<i64>,
 }
 
 #[derive(Deserialize)]
@@ -306,7 +332,8 @@ pub async fn update_sale(
         return Json(serde_json::json!({ "ok": false, "error": e.to_string() }));
     }
 
-    // Replace items
+    // Restore inventory for old items, then replace
+    restore_inventory(&state.pool, id).await;
     let _ = sqlx::query("DELETE FROM transaction_items WHERE transaction_id=?")
         .bind(id)
         .execute(&state.pool)
@@ -317,23 +344,123 @@ pub async fn update_sale(
 }
 
 async fn insert_items(pool: &sqlx::SqlitePool, txn_id: i64, items: &[SaleItem]) {
+    let now = unix_now();
     for item in items {
         if item.description.trim().is_empty() {
             continue;
         }
+        let set_code = item.set_code.as_deref().filter(|s| !s.is_empty()).unwrap_or("");
+        let condition = item.condition.as_deref().filter(|s| !s.is_empty()).unwrap_or("");
+
+        // Try to find and deduct from inventory lot (if set+condition are known)
+        let lot_id = if !set_code.is_empty() && !condition.is_empty() && item.sealed_id.is_none() {
+            deduct_lot(pool, &item.description, set_code, condition, item.quantity, now).await
+        } else {
+            None
+        };
+
+        // Deduct from sealed product if sealed_id provided
+        if let Some(sid) = item.sealed_id {
+            let _ = sqlx::query(
+                "UPDATE sealed_products SET quantity = MAX(0, quantity - ?), updated_at = ? WHERE id = ?",
+            )
+            .bind(item.quantity)
+            .bind(now)
+            .bind(sid)
+            .execute(pool)
+            .await;
+        }
+
         let _ = sqlx::query(
             "INSERT INTO transaction_items
-             (transaction_id, description, set_code, condition, quantity, sale_price, currency)
-             VALUES (?, ?, ?, ?, ?, ?, 'USD')",
+             (transaction_id, description, set_code, condition, quantity, sale_price, currency, lot_id, sealed_id)
+             VALUES (?, ?, ?, ?, ?, ?, 'USD', ?, ?)",
         )
         .bind(txn_id)
         .bind(&item.description)
-        .bind(item.set_code.as_deref().filter(|s| !s.is_empty()))
-        .bind(item.condition.as_deref().filter(|s| !s.is_empty()))
+        .bind(if set_code.is_empty() { None } else { Some(set_code) })
+        .bind(if condition.is_empty() { None } else { Some(condition) })
         .bind(item.quantity)
         .bind(item.unit_price)
+        .bind(lot_id)
+        .bind(item.sealed_id)
         .execute(pool)
         .await;
+    }
+}
+
+/// Parse foil suffix from description; return (base_name, foil_type).
+fn parse_desc_foil(desc: &str) -> (&str, &str) {
+    let d = desc.trim();
+    if d.ends_with(" (foil)")   { return (&d[..d.len()-7],  "foil"); }
+    if d.ends_with(" (etched)") { return (&d[..d.len()-9], "etched"); }
+    (d, "normal")
+}
+
+/// Find the best matching lot for name+set+condition+foil, deduct qty, return lot_id.
+async fn deduct_lot(
+    pool: &sqlx::SqlitePool,
+    description: &str,
+    set_code: &str,
+    condition: &str,
+    quantity: i64,
+    now: i64,
+) -> Option<i64> {
+    let (name, foil) = parse_desc_foil(description);
+    let row = sqlx::query(
+        "SELECT il.id FROM inventory_lots il
+         JOIN scryfall_cards sc ON sc.scryfall_id = il.scryfall_id
+         WHERE sc.name = ? AND LOWER(sc.set_code) = LOWER(?) AND il.condition = ? AND il.foil = ?
+         LIMIT 1",
+    )
+    .bind(name)
+    .bind(set_code)
+    .bind(condition)
+    .bind(foil)
+    .fetch_optional(pool)
+    .await
+    .ok()??;
+
+    let lot_id: i64 = row.get("id");
+    let _ = sqlx::query(
+        "UPDATE inventory_lots SET quantity = MAX(0, quantity - ?), updated_at = ? WHERE id = ?",
+    )
+    .bind(quantity)
+    .bind(now)
+    .bind(lot_id)
+    .execute(pool)
+    .await;
+
+    Some(lot_id)
+}
+
+/// Restore inventory quantities for all linked lots/sealed on a transaction being replaced.
+async fn restore_inventory(pool: &sqlx::SqlitePool, txn_id: i64) {
+    let now = unix_now();
+    let rows = sqlx::query(
+        "SELECT lot_id, sealed_id, quantity FROM transaction_items WHERE transaction_id = ?",
+    )
+    .bind(txn_id)
+    .fetch_all(pool)
+    .await
+    .unwrap_or_default();
+
+    for row in rows {
+        let qty: i64 = row.get("quantity");
+        if let Some(lot_id) = row.get::<Option<i64>, _>("lot_id") {
+            let _ = sqlx::query(
+                "UPDATE inventory_lots SET quantity = quantity + ?, updated_at = ? WHERE id = ?",
+            )
+            .bind(qty).bind(now).bind(lot_id)
+            .execute(pool).await;
+        }
+        if let Some(sid) = row.get::<Option<i64>, _>("sealed_id") {
+            let _ = sqlx::query(
+                "UPDATE sealed_products SET quantity = quantity + ?, updated_at = ? WHERE id = ?",
+            )
+            .bind(qty).bind(now).bind(sid)
+            .execute(pool).await;
+        }
     }
 }
 

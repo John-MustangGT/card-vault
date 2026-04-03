@@ -73,6 +73,20 @@
         .cat-mileage  { background:rgba(255,200,74,0.12); color:#ffc84a; border:1px solid rgba(255,200,74,0.25); }
         .cat-fees     { background:rgba(160,100,255,0.12); color:#a064ff; border:1px solid rgba(160,100,255,0.25); }
         .cat-other    { background:rgba(110,118,129,0.12); color:var(--text-dim); border:1px solid var(--border); }
+
+        /* P&L tiles */
+        .pnl-row { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+        .pnl-tile { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:0.9rem 1.25rem; min-width:160px; flex:1; }
+        .pnl-tile.revenue { border-color:rgba(46,164,79,0.4); }
+        .pnl-tile.net-pos  { border-color:rgba(46,164,79,0.6); }
+        .pnl-tile.net-neg  { border-color:rgba(207,68,68,0.4); }
+        .tile-val.revenue { color:var(--success); }
+        .tile-val.net-pos  { color:var(--success); }
+        .tile-val.net-neg  { color:var(--error); }
+
+        /* Invoices table */
+        .invoices-wrap { border:1px solid var(--border); border-radius:6px; overflow-x:auto; margin-bottom:1.5rem; }
+        .invoices-wrap table { font-size:0.8rem; }
     </style>
 </head>
 <body>
@@ -81,6 +95,7 @@
         <div class="nav-links">
             <a href="/import" class="nav-link">Import</a>
             <a href="/inventory" class="nav-link">Inventory</a>
+            <a href="/sealed" class="nav-link">Sealed</a>
             <a href="/individuals" class="nav-link">Singles</a>
             <a href="/locations" class="nav-link">Locations</a>
             <a href="/market" class="nav-link">Market</a>
@@ -94,11 +109,29 @@
             <h1>// ledger</h1>
         </div>
 
-        <!-- Summary tiles -->
+        <!-- P&L summary -->
+        <div class="pnl-row">
+            <div class="pnl-tile revenue">
+                <div class="tile-label">Revenue</div>
+                <div class="tile-val revenue">${{ (total_revenue)|usd }}</div>
+            </div>
+            <div class="pnl-tile">
+                <div class="tile-label">Expenses</div>
+                <div class="tile-val total">${{ (total_expenses)|usd }}</div>
+            </div>
+            <div class="pnl-tile {% if net >= 0 %}net-pos{% else %}net-neg{% endif %}">
+                <div class="tile-label">Net</div>
+                <div class="tile-val {% if net >= 0 %}net-pos{% else %}net-neg{% endif %}">
+                    {% if net >= 0 %}+{% endif %}${{ (net)|usd }}
+                </div>
+            </div>
+        </div>
+
+        <!-- Expense category tiles -->
         <div class="summary-row">
             <div class="summary-tile">
                 <div class="tile-label">Total Expenses</div>
-                <div class="tile-val total">${{ (grand_total)|usd }}</div>
+                <div class="tile-val total">${{ (total_expenses)|usd }}</div>
             </div>
             {% for c in by_category %}
             <div class="summary-tile">
@@ -107,6 +140,36 @@
             </div>
             {% endfor %}
         </div>
+
+        <!-- Invoices (revenue) -->
+        {% if invoices | length > 0 %}
+        <div class="invoices-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Invoice</th>
+                        <th>Buyer</th>
+                        <th>Platform</th>
+                        <th>Items</th>
+                        <th>Shipping</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for inv in invoices %}
+                <tr>
+                    <td class="mono"><a href="/sales/{{ inv.id }}" style="color:var(--accent); text-decoration:none">{{ inv.invoice_id }}</a></td>
+                    <td class="dim">{{ inv.buyer_name or "—" }}</td>
+                    <td class="dim">{{ inv.platform or "—" }}</td>
+                    <td class="mono">${{ (inv.subtotal)|usd }}</td>
+                    <td class="mono dim">{% if inv.shipping > 0 %}+${{ (inv.shipping)|usd }}{% else %}—{% endif %}</td>
+                    <td class="mono" style="color:var(--success)">${{ (inv.total)|usd }}</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
 
         <!-- Add entry -->
         <div class="add-panel">

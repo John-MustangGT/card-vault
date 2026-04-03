@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Vault — Sealed</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:#0d0f11; --surface:#151820; --border:#252a35; --accent:#4a9eff;
+            --accent-dim:#1e3a5f; --error:#cf4444; --success:#2ea44f;
+            --text:#c9d1d9; --text-dim:#6e7681;
+            --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+        }
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; }
+        nav { border-bottom:1px solid var(--border); padding:0 2rem; display:flex; align-items:center; gap:2rem; height:52px; }
+        .nav-brand { font-family:var(--mono); font-size:0.9rem; font-weight:600; color:var(--accent); letter-spacing:0.05em; text-decoration:none; }
+        .nav-links { display:flex; }
+        .nav-link { font-size:0.8rem; color:var(--text-dim); text-decoration:none; padding:0 1rem; height:52px; display:flex; align-items:center; border-bottom:2px solid transparent; font-family:var(--mono); }
+        .nav-link:hover { color:var(--text); }
+        .nav-link.active { color:var(--accent); border-bottom-color:var(--accent); }
+        main { padding:2rem; max-width:1100px; margin:0 auto; }
+        .page-header { display:flex; align-items:baseline; gap:1rem; margin-bottom:1.5rem; }
+        .page-header h1 { font-family:var(--mono); font-size:1.1rem; font-weight:600; letter-spacing:0.05em; }
+        .add-panel { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1.25rem 1.5rem; margin-bottom:1.5rem; }
+        .section-title { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.85rem; }
+        .form-row { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end; }
+        .field { display:flex; flex-direction:column; gap:0.3rem; }
+        .field label { font-family:var(--mono); font-size:0.68rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; }
+        .field input, .field select { background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:var(--mono); font-size:0.78rem; padding:0.42rem 0.65rem; outline:none; }
+        .field input:focus, .field select:focus { border-color:var(--accent); }
+        .field.grow { flex:1; min-width:140px; }
+        .btn { display:inline-flex; align-items:center; padding:0.45rem 1rem; background:var(--accent); color:#000; border:none; border-radius:4px; font-family:var(--mono); font-size:0.78rem; font-weight:600; cursor:pointer; text-decoration:none; }
+        .btn:hover { opacity:0.85; }
+        .btn-ghost { background:transparent; color:var(--text-dim); border:1px solid var(--border); }
+        .btn-ghost:hover { color:var(--text); }
+        .btn-sm { padding:0.28rem 0.55rem; font-size:0.72rem; }
+        .btn-danger { background:transparent; color:var(--error); border:1px solid transparent; }
+        .btn-danger:hover { border-color:var(--error); }
+        .table-wrap { border:1px solid var(--border); border-radius:6px; overflow-x:auto; }
+        table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+        thead { background:var(--surface); border-bottom:1px solid var(--border); }
+        th { font-family:var(--mono); font-size:0.68rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; padding:0.55rem 0.9rem; text-align:left; white-space:nowrap; }
+        td { padding:0.5rem 0.9rem; border-bottom:1px solid var(--border); vertical-align:middle; }
+        tr:last-child td { border-bottom:none; }
+        tr:hover td { background:rgba(255,255,255,0.02); }
+        .mono { font-family:var(--mono); }
+        .dim  { color:var(--text-dim); }
+        .empty-state { padding:3rem; text-align:center; font-family:var(--mono); font-size:0.82rem; color:var(--text-dim); }
+        .qty-ctrl { display:flex; align-items:center; gap:0.4rem; }
+        .qty-val { font-family:var(--mono); font-size:0.9rem; font-weight:600; min-width:28px; text-align:center; }
+        /* Type badges */
+        .type-badge { display:inline-block; padding:0.12rem 0.4rem; border-radius:3px; font-family:var(--mono); font-size:0.68rem; font-weight:500; }
+        .type-pack        { background:rgba(74,158,255,0.12);  color:var(--accent);  border:1px solid rgba(74,158,255,0.25); }
+        .type-booster_box { background:rgba(160,100,255,0.12); color:#a064ff; border:1px solid rgba(160,100,255,0.25); }
+        .type-precon_deck { background:rgba(46,164,79,0.12);  color:var(--success); border:1px solid rgba(46,164,79,0.25); }
+        .type-play_deck   { background:rgba(255,200,74,0.12);  color:#ffc84a; border:1px solid rgba(255,200,74,0.25); }
+        .type-bundle      { background:rgba(255,140,0,0.12);   color:#ff8c00; border:1px solid rgba(255,140,0,0.25); }
+        .type-other       { background:rgba(110,118,129,0.12); color:var(--text-dim); border:1px solid var(--border); }
+        .lang-badge { font-family:var(--mono); font-size:0.68rem; color:var(--text-dim); background:var(--surface); border:1px solid var(--border); border-radius:3px; padding:0.1rem 0.3rem; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" class="nav-brand">CARD-VAULT</a>
+        <div class="nav-links">
+            <a href="/import" class="nav-link">Import</a>
+            <a href="/inventory" class="nav-link">Inventory</a>
+            <a href="/sealed" class="nav-link active">Sealed</a>
+            <a href="/individuals" class="nav-link">Singles</a>
+            <a href="/locations" class="nav-link">Locations</a>
+            <a href="/market" class="nav-link">Market</a>
+            <a href="/ledger" class="nav-link">Ledger</a>
+            <a href="/sales" class="nav-link">Sales</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="page-header"><h1>// sealed inventory</h1></div>
+
+        <!-- Add form -->
+        <div class="add-panel">
+            <div class="section-title">Add Sealed Product</div>
+            <form method="post" action="/sealed">
+                <div class="form-row" style="margin-bottom:0.65rem">
+                    <div class="field" style="width:150px">
+                        <label>Type</label>
+                        <select name="product_type" required>
+                            <option value="pack">Booster Pack</option>
+                            <option value="booster_box">Booster Box</option>
+                            <option value="precon_deck">Precon Deck</option>
+                            <option value="play_deck">Play Deck</option>
+                            <option value="bundle">Bundle</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                    <div class="field grow">
+                        <label>Name</label>
+                        <input type="text" name="name" required placeholder="e.g. Bloomburrow Booster Box">
+                    </div>
+                    <div class="field" style="width:80px">
+                        <label>Set Code</label>
+                        <input type="text" name="set_code" placeholder="BLB" style="text-transform:uppercase" maxlength="8">
+                    </div>
+                    <div class="field grow">
+                        <label>Set Name</label>
+                        <input type="text" name="set_name" placeholder="Bloomburrow">
+                    </div>
+                    <div class="field" style="width:80px">
+                        <label>Language</label>
+                        <select name="language">
+                            <option value="en">EN</option>
+                            <option value="jp">JP</option>
+                            <option value="de">DE</option>
+                            <option value="fr">FR</option>
+                            <option value="es">ES</option>
+                            <option value="it">IT</option>
+                            <option value="pt">PT</option>
+                            <option value="ko">KO</option>
+                            <option value="ru">RU</option>
+                            <option value="zhs">ZH-S</option>
+                            <option value="zht">ZH-T</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="field" style="width:80px">
+                        <label>Qty</label>
+                        <input type="number" name="quantity" value="1" min="1" required>
+                    </div>
+                    <div class="field" style="width:120px">
+                        <label>Cost ($)</label>
+                        <input type="number" name="acquisition_cost" step="0.01" min="0" placeholder="optional">
+                    </div>
+                    <div class="field grow">
+                        <label>Notes</label>
+                        <input type="text" name="notes" placeholder="optional">
+                    </div>
+                    <div class="field" style="width:160px">
+                        <label>Location</label>
+                        <select name="location_id">
+                            <option value="">— none —</option>
+                            {% for loc in locations %}
+                            <option value="{{ loc.id }}">{{ loc.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="field" style="justify-content:flex-end">
+                        <button type="submit" class="btn">Add</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+
+        <!-- Product list -->
+        <div class="table-wrap">
+            {% if products | length == 0 %}
+            <div class="empty-state">No sealed products yet.</div>
+            {% else %}
+            <table>
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Set</th>
+                        <th>Lang</th>
+                        <th>Cost</th>
+                        <th>Location</th>
+                        <th>Qty</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for p in products %}
+                <tr>
+                    <td><span class="type-badge type-{{ p.product_type }}">{{ p.product_type | replace("_", " ") }}</span></td>
+                    <td>
+                        {{ p.name }}
+                        {% if p.notes %}<div class="dim" style="font-size:0.72rem">{{ p.notes }}</div>{% endif %}
+                    </td>
+                    <td class="mono dim">{% if p.set_code %}{{ p.set_code | upper }}{% else %}—{% endif %}</td>
+                    <td><span class="lang-badge">{{ p.language | upper }}</span></td>
+                    <td class="mono dim">{% if p.acquisition_cost %}${{ (p.acquisition_cost)|usd }}{% else %}—{% endif %}</td>
+                    <td class="dim">{{ p.location_name or "—" }}</td>
+                    <td>
+                        <div class="qty-ctrl">
+                            <button class="btn btn-ghost btn-sm" onclick="adjustQty({{ p.id }}, -1, this)">−</button>
+                            <span class="qty-val" id="qty-{{ p.id }}">{{ p.quantity }}</span>
+                            <button class="btn btn-ghost btn-sm" onclick="adjustQty({{ p.id }}, +1, this)">+</button>
+                        </div>
+                    </td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="deleteProduct({{ p.id }}, this)">✕</button>
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+            {% endif %}
+        </div>
+    </main>
+
+    <script>
+        async function adjustQty(id, delta, btn) {
+            btn.disabled = true;
+            const r = await fetch(`/sealed/${id}/qty`, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ delta })
+            });
+            const d = await r.json();
+            if (d.ok) document.getElementById('qty-' + id).textContent = d.quantity;
+            btn.disabled = false;
+        }
+
+        async function deleteProduct(id, btn) {
+            if (!confirm('Delete this sealed product?')) return;
+            btn.disabled = true;
+            const r = await fetch(`/sealed/${id}/delete`, { method: 'POST' });
+            const d = await r.json();
+            if (d.ok) btn.closest('tr').remove();
+            else btn.disabled = false;
+        }
+    </script>
+</body>
+</html>

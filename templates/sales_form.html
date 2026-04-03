@@ -79,6 +79,7 @@
         <div class="nav-links">
             <a href="/import" class="nav-link">Import</a>
             <a href="/inventory" class="nav-link">Inventory</a>
+            <a href="/sealed" class="nav-link">Sealed</a>
             <a href="/individuals" class="nav-link">Singles</a>
             <a href="/locations" class="nav-link">Locations</a>
             <a href="/market" class="nav-link">Market</a>
@@ -227,11 +228,18 @@
                 const results = data.results || [];
                 if (!results.length) { dropdown.style.display = 'none'; return; }
                 _acActive = -1;
-                dropdown.innerHTML = results.map((r, i) => `
-                    <div class="ac-item" data-i="${i}">
+                dropdown.innerHTML = results.map((r, i) => {
+                    if (r.kind === 'sealed') {
+                        return `<div class="ac-item" data-i="${i}">
+                            <div class="ac-name">${r.name} <span style="color:#ff8c00">[sealed]</span></div>
+                            <div class="ac-meta">${r.set_code ? r.set_code.toUpperCase() + ' · ' : ''}${r.product_type.replace(/_/g,' ')} · ${r.language.toUpperCase()} · qty ${r.qty}</div>
+                        </div>`;
+                    }
+                    return `<div class="ac-item" data-i="${i}">
                         <div class="ac-name">${r.name}${r.foil !== 'normal' ? ' <span style="color:var(--accent)">(' + r.foil + ')</span>' : ''}</div>
                         <div class="ac-meta">${r.set_code.toUpperCase()} · ${r.set_name} · ${r.condition.replace(/_/g,' ')} · qty ${r.qty}</div>
-                    </div>`).join('');
+                    </div>`;
+                }).join('');
                 dropdown.querySelectorAll('.ac-item').forEach((el, i) => {
                     el.addEventListener('mousedown', e => { e.preventDefault(); applyAc(results[i], input, row, dropdown); });
                 });
@@ -240,11 +248,19 @@
         }
 
         function applyAc(result, input, row, dropdown) {
-            input.value = result.name + (result.foil !== 'normal' ? ` (${result.foil})` : '');
-            const setInput = row.querySelector('.col-set');
-            const condSel  = row.querySelector('.col-cond');
-            if (setInput) setInput.value = result.set_code.toUpperCase();
-            if (condSel)  condSel.value  = result.condition;
+            if (result.kind === 'sealed') {
+                input.value = result.name;
+                const setInput = row.querySelector('.col-set');
+                if (setInput) setInput.value = result.set_code ? result.set_code.toUpperCase() : '';
+                row.dataset.sealedId = result.sealed_id;
+            } else {
+                input.value = result.name + (result.foil !== 'normal' ? ` (${result.foil})` : '');
+                const setInput = row.querySelector('.col-set');
+                const condSel  = row.querySelector('.col-cond');
+                if (setInput) setInput.value = result.set_code.toUpperCase();
+                if (condSel)  condSel.value  = result.condition;
+                delete row.dataset.sealedId;
+            }
             dropdown.style.display = 'none';
         }
 
@@ -255,7 +271,7 @@
             ).join('');
         }
 
-        function buildRow(desc='', set='', cond='', qty=1, price='', removable=true) {
+        function buildRow(desc='', set='', cond='', qty=1, price='', removable=true, sealedId=null) {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="ac-wrap"><input type="text" class="col-desc" value="${esc(desc)}" placeholder="Card name"></td>
@@ -264,6 +280,7 @@
                 <td><input type="number" class="col-qty" value="${qty}" min="1" step="1" style="width:56px"></td>
                 <td><input type="number" class="col-price" value="${price}" step="0.01" min="0" placeholder="0.00"></td>
                 <td>${removable ? '<button type="button" class="btn btn-danger btn-sm" onclick="this.closest(\'tr\').remove()">✕</button>' : ''}</td>`;
+            if (sealedId) tr.dataset.sealedId = sealedId;
             const descInput = tr.querySelector('.col-desc');
             attachAc(descInput, tr);
             return tr;
@@ -271,8 +288,8 @@
 
         function esc(s) { return String(s).replace(/"/g, '&quot;'); }
 
-        function addRow(desc, set, cond, qty, price, removable) {
-            document.getElementById('items-body').appendChild(buildRow(desc, set, cond, qty, price, removable !== false));
+        function addRow(desc, set, cond, qty, price, removable, sealedId) {
+            document.getElementById('items-body').appendChild(buildRow(desc, set, cond, qty, price, removable !== false, sealedId || null));
         }
 
         // ── Pre-populate for edit ──────────────────────────────────────────────
@@ -300,7 +317,7 @@
             // Items
             const items = _p.items || [];
             if (items.length === 0) { addRow(); return; }
-            items.forEach((item, i) => addRow(item.description, item.set_code, item.condition, item.quantity, item.unit_price, i > 0));
+            items.forEach((item, i) => addRow(item.description, item.set_code, item.condition, item.quantity, item.unit_price, i > 0, item.sealed_id));
         });
 
         // ── Submit ─────────────────────────────────────────────────────────────
@@ -315,6 +332,7 @@
                 condition:   r.querySelector('.col-cond').value || null,
                 quantity:    parseInt(r.querySelector('.col-qty').value) || 1,
                 unit_price:  parseFloat(r.querySelector('.col-price').value) || 0,
+                sealed_id:   r.dataset.sealedId ? parseInt(r.dataset.sealedId) : null,
             })).filter(i => i.description);
 
             if (!document.getElementById('buyer_name').value.trim()) {
