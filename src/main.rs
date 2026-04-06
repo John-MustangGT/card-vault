@@ -74,6 +74,8 @@ async fn main() -> Result<()> {
         .route("/import", post(routes::import::handle_import))
         .route("/inventory", get(routes::inventory::inventory_page))
         .route("/inventory/refresh-prices", post(routes::inventory::refresh_prices))
+        .route("/inventory/lot/:id", post(routes::inventory::update_lot))
+        .route("/inventory/lots/bulk-move", post(routes::inventory::bulk_move_lots))
         .route("/individuals", get(routes::individuals::individuals_page))
         .route("/inventory/card/:scryfall_id", get(routes::inventory::card_detail))
         .route("/inventory/card/:scryfall_id/individual", post(routes::inventory::create_individual))

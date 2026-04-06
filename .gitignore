@@ -28,5 +28,4 @@ card-vault.db
 card-vault.db-shm
 card-vault.db-wal
 data/all-cards-*.json.gz
-migrations/*.sql
 

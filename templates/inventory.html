@@ -242,6 +242,55 @@
             font-family: var(--mono);
             font-size: 0.85rem;
         }
+
+        /* Checkboxes */
+        th.cb-col, td.cb-col { width: 36px; padding: 0.55rem 0.5rem 0.55rem 1rem; }
+        input[type=checkbox] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+
+        /* Qty control */
+        .qty-ctrl { display: inline-flex; align-items: center; gap: 0.25rem; }
+        .qty-btn { background: none; border: 1px solid var(--border); border-radius: 3px; color: var(--text-dim);
+                   font-family: var(--mono); font-size: 0.7rem; padding: 0.1rem 0.35rem; cursor: pointer; line-height: 1; }
+        .qty-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .qty-val { font-family: var(--mono); font-weight: 600; min-width: 1.5rem; text-align: center; }
+
+        /* Shop price */
+        .shop-price { color: #ffc84a; font-family: var(--mono); }
+        .shop-price::before { content: '⚑ '; font-size: 0.6rem; opacity: 0.7; }
+
+        /* Edit row */
+        .edit-row td { background: var(--surface); padding: 0; border-bottom: 2px solid var(--accent); }
+        .edit-panel { padding: 0.85rem 1rem; display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: flex-end; }
+        .ep-field { display: flex; flex-direction: column; gap: 0.25rem; }
+        .ep-label { font-family: var(--mono); font-size: 0.62rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+        .ep-input { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; color: var(--text);
+                    font-family: var(--mono); font-size: 0.78rem; padding: 0.35rem 0.55rem; outline: none; }
+        .ep-input:focus { border-color: var(--accent); }
+        .ep-actions { display: flex; gap: 0.5rem; align-items: flex-end; }
+        .btn-save  { background: var(--accent); color: #000; border: none; border-radius: 4px;
+                     font-family: var(--mono); font-size: 0.75rem; font-weight: 600; padding: 0.38rem 0.85rem; cursor: pointer; }
+        .btn-save:hover { opacity: 0.85; }
+        .btn-cancel { background: transparent; color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px;
+                      font-family: var(--mono); font-size: 0.75rem; padding: 0.38rem 0.85rem; cursor: pointer; }
+        .btn-cancel:hover { color: var(--text); }
+        .btn-edit { background: transparent; color: var(--text-dim); border: 1px solid var(--border); border-radius: 3px;
+                    font-family: var(--mono); font-size: 0.68rem; padding: 0.18rem 0.5rem; cursor: pointer; white-space: nowrap; }
+        .btn-edit:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-edit.open { border-color: var(--accent); color: var(--accent); }
+
+        /* Bulk action bar */
+        #bulk-bar {
+            display: none; position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+            background: var(--surface); border: 1px solid var(--accent); border-radius: 8px;
+            padding: 0.65rem 1.25rem; display: none; align-items: center; gap: 1rem;
+            box-shadow: 0 4px 24px rgba(0,0,0,0.5); z-index: 200; white-space: nowrap;
+        }
+        #bulk-bar.visible { display: flex; }
+        .bulk-count { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); font-weight: 600; }
+        .bulk-sep { color: var(--border); }
+        .bulk-loc-select { background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
+                           color: var(--text); font-family: var(--mono); font-size: 0.75rem; padding: 0.32rem 0.55rem; outline: none; }
+        .bulk-loc-select:focus { border-color: var(--accent); }
     </style>
 </head>
 <body>
@@ -294,44 +343,60 @@
             {% if rows | length == 0 %}
             <div class="empty-state">No inventory lots found.</div>
             {% else %}
-            <table>
+            <table id="inv-table">
                 <thead>
                     <tr>
-                        <th class="sortable" onclick="sortTable(0,false)">Name<span class="sort-icon"> ⇅</span></th>
-                        <th class="sortable" onclick="sortTable(1,false)">Set<span class="sort-icon"> ⇅</span></th>
-                        <th class="sortable" onclick="sortTable(2,false)">Lang<span class="sort-icon"> ⇅</span></th>
+                        <th class="cb-col"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
+                        <th class="sortable" onclick="sortTable(1,false)">Name<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable" onclick="sortTable(2,false)">Set<span class="sort-icon"> ⇅</span></th>
                         <th class="sortable" onclick="sortTable(3,false)">Finish<span class="sort-icon"> ⇅</span></th>
                         <th class="sortable" onclick="sortTable(4,false)">Condition<span class="sort-icon"> ⇅</span></th>
                         <th class="sortable" onclick="sortTable(5,true)">Qty<span class="sort-icon"> ⇅</span></th>
-                        <th class="sortable" onclick="sortTable(6,true)">Price<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable" onclick="sortTable(6,false)">Location<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable" onclick="sortTable(7,true)">Market $<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable" onclick="sortTable(8,true)">Shop $<span class="sort-icon"> ⇅</span></th>
+                        <th></th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for row in rows %}
-                    <tr style="cursor:pointer" onclick="window.location='/inventory/card/{{ row.scryfall_id }}'">
-                        <td class="card-name">{{ row.name }}</td>
-                        <td class="set-info">
+                    <tr class="inv-row" data-lot-id="{{ row.lot_id }}"
+                        data-lot='{"lot_id":{{ row.lot_id }},"condition":"{{ row.condition }}","foil":"{{ row.foil }}","quantity":{{ row.quantity }},"acquisition_cost":{{ row.acquisition_cost or "null" }},"location_id":{{ row.location_id or "null" }},"location_name":"{{ row.location_name or "" }}","shop_price":{{ row.shop_price or "null" }},"notes":"{{ row.notes or "" }}","price_usd":{{ row.price_usd or "null" }}}'>
+                        <td class="cb-col" onclick="event.stopPropagation()">
+                            <input type="checkbox" class="lot-chk" data-lot-id="{{ row.lot_id }}" onchange="updateBulkBar()">
+                        </td>
+                        <td class="card-name" style="cursor:pointer" onclick="window.location='/inventory/card/{{ row.scryfall_id }}'">
+                            {{ row.name }}
+                        </td>
+                        <td class="set-info" style="cursor:pointer" onclick="window.location='/inventory/card/{{ row.scryfall_id }}'">
                             {% if row.set_code %}{{ row.set_code | upper }}{% else %}—{% endif %}
                             {% if row.collector_number %}<span style="color:var(--text-dim)"> #{{ row.collector_number }}</span>{% endif %}
                         </td>
-                        <td class="set-info">{{ row.language | upper }}</td>
                         <td>
-                            {% if row.foil == "foil" %}
-                            <span class="badge badge-foil">foil</span>
-                            {% elif row.foil == "etched" %}
-                            <span class="badge badge-etched">etched</span>
-                            {% else %}
-                            <span class="badge badge-normal">—</span>
-                            {% endif %}
+                            {% if row.foil == "foil" %}<span class="badge badge-foil">foil</span>
+                            {% elif row.foil == "etched" %}<span class="badge badge-etched">etched</span>
+                            {% else %}<span class="badge badge-normal">—</span>{% endif %}
                         </td>
                         <td class="set-info">{{ row.condition }}</td>
-                        <td class="qty" data-val="{{ row.quantity }}">{{ row.quantity }}</td>
+                        <td data-val="{{ row.quantity }}">
+                            <div class="qty-ctrl">
+                                <button class="qty-btn" onclick="quickQty({{ row.lot_id }}, -1, this)" title="-1">−</button>
+                                <span class="qty-val" id="qty-{{ row.lot_id }}">{{ row.quantity }}</span>
+                                <button class="qty-btn" onclick="quickQty({{ row.lot_id }}, +1, this)" title="+1">+</button>
+                            </div>
+                        </td>
+                        <td class="set-info" id="loc-{{ row.lot_id }}">{{ row.location_name or "—" }}</td>
                         <td data-val="{{ row.price_usd or 0 }}">
-                            {% if row.price_usd %}
-                            <span class="price-cell">${{ (row.price_usd)|usd }}</span>
-                            {% else %}
-                            <span class="price-none">—</span>
-                            {% endif %}
+                            {% if row.price_usd %}<span class="price-cell">${{ (row.price_usd)|usd }}</span>
+                            {% else %}<span class="price-none">—</span>{% endif %}
+                        </td>
+                        <td data-val="{{ row.shop_price or 0 }}" id="shop-{{ row.lot_id }}">
+                            {% if row.shop_price %}<span class="shop-price">${{ (row.shop_price)|usd }}</span>
+                            {% else %}<span class="price-none">—</span>{% endif %}
+                        </td>
+                        <td onclick="event.stopPropagation()">
+                            <button class="btn-edit" id="edit-btn-{{ row.lot_id }}"
+                                    onclick="toggleEdit({{ row.lot_id }})">Edit</button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -339,43 +404,286 @@
             </table>
             {% endif %}
         </div>
+
+        <!-- Bulk action bar -->
+        <div id="bulk-bar">
+            <span class="bulk-count" id="bulk-count">0 selected</span>
+            <span class="bulk-sep">|</span>
+            <span style="font-family:var(--mono); font-size:0.75rem; color:var(--text-dim)">Move to:</span>
+            <select class="bulk-loc-select" id="bulk-loc">
+                <option value="">— clear location —</option>
+                {% for row in rows %}{% endfor %}{# locations injected via JS #}
+            </select>
+            <button class="btn-save" onclick="bulkMove()">Apply</button>
+            <button class="btn-cancel" onclick="clearSelection()">✕</button>
+        </div>
     </main>
 
     <script>
-        // ── Column sort ──────────────────────────────────────────────
+        // ── Locations list (for bulk bar + edit form) ─────────────────────────
+        // Populated from server-rendered data on first edit open
+        let _locations = null;
+        async function getLocations() {
+            if (_locations) return _locations;
+            // Scrape from any open edit panel, or fetch fresh
+            const r = await fetch('/locations').then(r => r.text());
+            const doc = new DOMParser().parseFromString(r, 'text/html');
+            _locations = [...doc.querySelectorAll('table tbody tr')].map(tr => ({
+                id:   parseInt(tr.cells[0]?.textContent?.trim() || '0'),
+                name: tr.cells[1]?.textContent?.trim() || '',
+            })).filter(l => l.id > 0);
+            return _locations;
+        }
+
+        // ── Column sort ──────────────────────────────────────────────────────
         let _sortCol = -1, _sortAsc = true;
 
         function sortTable(col, isNum) {
-            const tbody = document.querySelector('tbody');
+            const tbody = document.querySelector('#inv-table tbody');
             if (!tbody) return;
-            const rows = [...tbody.querySelectorAll('tr')];
-
+            const rows = [...tbody.querySelectorAll('tr.inv-row')];
             _sortAsc = (_sortCol === col) ? !_sortAsc : true;
             _sortCol = col;
-
             rows.sort((a, b) => {
                 const av = a.cells[col].dataset.val ?? a.cells[col].textContent.trim();
                 const bv = b.cells[col].dataset.val ?? b.cells[col].textContent.trim();
-                const cmp = isNum
-                    ? (parseFloat(av) || 0) - (parseFloat(bv) || 0)
-                    : av.localeCompare(bv);
+                const cmp = isNum ? (parseFloat(av)||0)-(parseFloat(bv)||0) : av.localeCompare(bv);
                 return _sortAsc ? cmp : -cmp;
             });
-            rows.forEach(r => tbody.appendChild(r));
-
+            // Re-insert display rows only (preserve any open edit rows)
+            rows.forEach(r => {
+                const edit = document.getElementById('edit-row-' + r.dataset.lotId);
+                tbody.appendChild(r);
+                if (edit) tbody.appendChild(edit);
+            });
             document.querySelectorAll('th.sortable').forEach((th, i) => {
                 const icon = th.querySelector('.sort-icon');
-                th.classList.toggle('sort-active', i === col);
-                icon.textContent = (i === col) ? (_sortAsc ? ' ▲' : ' ▼') : ' ⇅';
+                const active = (i === col);
+                th.classList.toggle('sort-active', active);
+                icon.textContent = active ? (_sortAsc ? ' ▲' : ' ▼') : ' ⇅';
             });
         }
 
-        // ── Price refresh ────────────────────────────────────────────
+        // ── Quick ±1 qty ─────────────────────────────────────────────────────
+        async function quickQty(lotId, delta, btn) {
+            btn.disabled = true;
+            const span = document.getElementById('qty-' + lotId);
+            const cur = parseInt(span.textContent) || 0;
+            const newQty = Math.max(0, cur + delta);
+            try {
+                const r = await fetch('/inventory/lot/' + lotId, {
+                    method: 'POST',
+                    headers: {'Content-Type':'application/json'},
+                    body: JSON.stringify({ quantity: newQty }),
+                });
+                const d = await r.json();
+                if (d.ok) {
+                    span.textContent = d.quantity;
+                    // Update data-val on the td for sorting
+                    span.closest('td').dataset.val = d.quantity;
+                }
+            } finally { btn.disabled = false; }
+        }
+
+        // ── Inline edit row ──────────────────────────────────────────────────
+        async function toggleEdit(lotId) {
+            const btn = document.getElementById('edit-btn-' + lotId);
+            const existing = document.getElementById('edit-row-' + lotId);
+            if (existing) { existing.remove(); btn.textContent = 'Edit'; btn.classList.remove('open'); return; }
+
+            // Close any other open edit rows
+            document.querySelectorAll('.edit-row').forEach(r => r.remove());
+            document.querySelectorAll('.btn-edit').forEach(b => { b.textContent = 'Edit'; b.classList.remove('open'); });
+
+            const tr = document.querySelector(`tr[data-lot-id="${lotId}"]`);
+            const d = JSON.parse(tr.dataset.lot);
+
+            const locs = await getLocations();
+            const locOpts = '<option value="0">— none —</option>' +
+                locs.map(l => `<option value="${l.id}" ${d.location_id == l.id ? 'selected' : ''}>${l.name}</option>`).join('');
+
+            const editTr = document.createElement('tr');
+            editTr.id = 'edit-row-' + lotId;
+            editTr.className = 'edit-row';
+            editTr.innerHTML = `<td colspan="10"><div class="edit-panel">
+                <div class="ep-field">
+                    <span class="ep-label">Condition</span>
+                    <select class="ep-input" id="ep-cond-${lotId}">
+                        ${['near_mint','lightly_played','moderately_played','heavily_played','damaged']
+                            .map(c => `<option value="${c}" ${d.condition===c?'selected':''}>${c.replace(/_/g,' ')}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="ep-field">
+                    <span class="ep-label">Finish</span>
+                    <select class="ep-input" id="ep-foil-${lotId}">
+                        ${['normal','foil','etched'].map(f => `<option value="${f}" ${d.foil===f?'selected':''}>${f}</option>`).join('')}
+                    </select>
+                </div>
+                <div class="ep-field" style="width:70px">
+                    <span class="ep-label">Qty</span>
+                    <input class="ep-input" type="number" id="ep-qty-${lotId}" value="${d.quantity}" min="0" step="1">
+                </div>
+                <div class="ep-field" style="width:110px">
+                    <span class="ep-label">Cost ($)</span>
+                    <input class="ep-input" type="number" id="ep-cost-${lotId}" value="${d.acquisition_cost ?? ''}" min="0" step="0.01" placeholder="—">
+                </div>
+                <div class="ep-field">
+                    <span class="ep-label">Location</span>
+                    <select class="ep-input" id="ep-loc-${lotId}">${locOpts}</select>
+                </div>
+                <div class="ep-field" style="width:120px">
+                    <span class="ep-label">Shop $ <span style="color:var(--text-dim);font-size:0.6rem">(override)</span></span>
+                    <input class="ep-input" type="number" id="ep-shop-${lotId}" value="${d.shop_price ?? ''}" min="0" step="0.01" placeholder="— market —">
+                </div>
+                <div class="ep-field" style="flex:1; min-width:160px">
+                    <span class="ep-label">Notes</span>
+                    <input class="ep-input" type="text" id="ep-notes-${lotId}" value="${(d.notes||'').replace(/"/g,'&quot;')}" placeholder="optional">
+                </div>
+                <div class="ep-actions">
+                    <button class="btn-save"   onclick="saveLot(${lotId})">Save</button>
+                    <button class="btn-cancel" onclick="toggleEdit(${lotId})">Cancel</button>
+                </div>
+            </div></td>`;
+            tr.after(editTr);
+            btn.textContent = 'Close';
+            btn.classList.add('open');
+        }
+
+        async function saveLot(lotId) {
+            const tr   = document.querySelector(`tr[data-lot-id="${lotId}"]`);
+            const d    = JSON.parse(tr.dataset.lot);
+            const get  = id => document.getElementById(id);
+
+            const condition = get(`ep-cond-${lotId}`).value;
+            const foil      = get(`ep-foil-${lotId}`).value;
+            const quantity  = parseInt(get(`ep-qty-${lotId}`).value) || 0;
+            const costRaw   = get(`ep-cost-${lotId}`).value.trim();
+            const locId     = parseInt(get(`ep-loc-${lotId}`).value) || 0;
+            const shopRaw   = get(`ep-shop-${lotId}`).value.trim();
+            const notes     = get(`ep-notes-${lotId}`).value.trim();
+
+            const body = {
+                condition, foil, quantity, notes,
+                acquisition_cost: costRaw ? parseFloat(costRaw) : null,
+                location_id:      locId || null,
+            };
+            // Shop price: send value or clear flag
+            if (shopRaw === '') {
+                body.clear_shop_price = true;
+            } else {
+                body.shop_price = parseFloat(shopRaw);
+            }
+
+            const r = await fetch('/inventory/lot/' + lotId, {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify(body),
+            });
+            const res = await r.json();
+            if (!res.ok) { alert('Save failed: ' + res.error); return; }
+
+            // Update display row values
+            const cells = tr.cells;
+            // condition (col 4), foil (col 3) via badge, qty (col 5), location (col 6), shop (col 8)
+            cells[4].textContent = condition.replace(/_/g, ' ');
+            cells[3].innerHTML = foil === 'foil'   ? '<span class="badge badge-foil">foil</span>' :
+                                 foil === 'etched' ? '<span class="badge badge-etched">etched</span>' :
+                                                     '<span class="badge badge-normal">—</span>';
+            document.getElementById('qty-' + lotId).textContent = quantity;
+            cells[5].dataset.val = quantity;
+            const locEl = document.getElementById('loc-' + lotId);
+            const locName = get(`ep-loc-${lotId}`).options[get(`ep-loc-${lotId}`).selectedIndex].text;
+            locEl.textContent = locId ? locName : '—';
+            const shopEl = document.getElementById('shop-' + lotId);
+            shopEl.innerHTML = res.shop_price != null
+                ? `<span class="shop-price">$${parseFloat(res.shop_price).toFixed(2)}</span>`
+                : '<span class="price-none">—</span>';
+            shopEl.dataset.val = res.shop_price ?? 0;
+
+            // Refresh the row's data-lot so future edits see new values
+            tr.dataset.lot = JSON.stringify(Object.assign(d, {
+                condition, foil, quantity,
+                acquisition_cost: body.acquisition_cost,
+                location_id: body.location_id,
+                location_name: locId ? locName : '',
+                shop_price: res.shop_price,
+                notes: notes || '',
+            }));
+
+            toggleEdit(lotId); // close
+        }
+
+        // ── Checkboxes + bulk bar ─────────────────────────────────────────────
+        function toggleAll(master) {
+            document.querySelectorAll('.lot-chk').forEach(cb => cb.checked = master.checked);
+            updateBulkBar();
+        }
+
+        function updateBulkBar() {
+            const checked = document.querySelectorAll('.lot-chk:checked');
+            const bar = document.getElementById('bulk-bar');
+            document.getElementById('bulk-count').textContent = checked.length + ' selected';
+            bar.classList.toggle('visible', checked.length > 0);
+            // Populate location dropdown on first show
+            if (checked.length === 1) populateBulkLoc();
+        }
+
+        async function populateBulkLoc() {
+            const sel = document.getElementById('bulk-loc');
+            if (sel.dataset.loaded) return;
+            const locs = await getLocations();
+            locs.forEach(l => {
+                const o = document.createElement('option');
+                o.value = l.id; o.textContent = l.name;
+                sel.appendChild(o);
+            });
+            sel.dataset.loaded = '1';
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.lot-chk').forEach(cb => cb.checked = false);
+            document.getElementById('chk-all').checked = false;
+            document.getElementById('bulk-bar').classList.remove('visible');
+        }
+
+        async function bulkMove() {
+            const ids = [...document.querySelectorAll('.lot-chk:checked')]
+                .map(cb => parseInt(cb.dataset.lotId));
+            const locVal = document.getElementById('bulk-loc').value;
+            const location_id = locVal ? parseInt(locVal) : null;
+            const r = await fetch('/inventory/lots/bulk-move', {
+                method: 'POST',
+                headers: {'Content-Type':'application/json'},
+                body: JSON.stringify({ lot_ids: ids, location_id }),
+            });
+            const d = await r.json();
+            if (d.ok) {
+                // Update location cells in-place
+                const locName = location_id
+                    ? document.getElementById('bulk-loc').options[document.getElementById('bulk-loc').selectedIndex].text
+                    : '—';
+                ids.forEach(id => {
+                    const locEl = document.getElementById('loc-' + id);
+                    if (locEl) locEl.textContent = locName;
+                    // Update data-lot
+                    const tr = document.querySelector(`tr[data-lot-id="${id}"]`);
+                    if (tr) {
+                        const lot = JSON.parse(tr.dataset.lot);
+                        lot.location_id = location_id;
+                        lot.location_name = locName === '—' ? '' : locName;
+                        tr.dataset.lot = JSON.stringify(lot);
+                    }
+                });
+                clearSelection();
+            } else {
+                alert('Bulk move failed: ' + d.error);
+            }
+        }
+
+        // ── Price refresh ─────────────────────────────────────────────────────
         async function refreshPrices() {
             const btn = document.getElementById('refresh-btn');
-            btn.disabled = true;
-            btn.textContent = 'Fetching…';
-
+            btn.disabled = true; btn.textContent = 'Fetching…';
             try {
                 const resp = await fetch('/inventory/refresh-prices', { method: 'POST' });
                 const data = await resp.json();
@@ -383,14 +691,9 @@
                     btn.textContent = `✓ ${data.updated} / ${data.total} updated`;
                     setTimeout(() => location.reload(), 1200);
                 } else {
-                    btn.textContent = 'Error — see console';
-                    btn.disabled = false;
-                    console.error(data);
+                    btn.textContent = 'Error'; btn.disabled = false;
                 }
-            } catch (e) {
-                btn.textContent = 'Network error';
-                btn.disabled = false;
-            }
+            } catch(e) { btn.textContent = 'Network error'; btn.disabled = false; }
         }
     </script>
 </body>
