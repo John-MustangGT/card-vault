@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Labels — {{ brand }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400&display=swap" rel="stylesheet">
+    <style>
+        /* ── Print page setup ─────────────────────────────── */
+        @page {
+            size: 8.5in 11in;
+            margin: 0;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: white; color: black; }
+
+        /* ── Sheet ────────────────────────────────────────── */
+        /* Avery 8167: 4 col × 20 row, label 1.75"×0.5"
+           Top margin 0.5", left margin 0.3", col-gap 0.3" */
+        .sheet {
+            width: 8.5in;
+            min-height: 11in;
+            padding-top: 0.5in;
+            padding-left: 0.3in;
+        }
+        .labels-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1.75in);
+            grid-template-rows: repeat(20, 0.5in);
+            column-gap: 0.3in;
+            row-gap: 0;
+        }
+
+        /* ── Individual label ─────────────────────────────── */
+        .label {
+            width: 1.75in;
+            height: 0.5in;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            padding: 0.03in 0.04in;
+            gap: 0.05in;
+        }
+        /* Data matrix wrapper — fixed square on the left */
+        .dm-wrap {
+            flex-shrink: 0;
+            width: 0.40in;
+            height: 0.40in;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .dm-wrap canvas {
+            display: block;
+            max-width: 0.40in;
+            max-height: 0.40in;
+            width: auto;
+            height: auto;
+            image-rendering: pixelated;
+        }
+        /* Text stack */
+        .label-text {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 0.01in;
+        }
+        .label-brand {
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: 4.5pt;
+            color: #555;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            line-height: 1.2;
+        }
+        .label-uid {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 8pt;
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            line-height: 1.2;
+            color: #000;
+        }
+
+        /* ── Non-print controls ───────────────────────────── */
+        .controls {
+            position: fixed;
+            top: 0.75rem;
+            right: 1rem;
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+            z-index: 999;
+            background: rgba(0,0,0,0.7);
+            padding: 0.4rem 0.75rem;
+            border-radius: 6px;
+        }
+        .ctrl-btn {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 0.35rem 0.85rem;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .ctrl-print { background: #4a9eff; color: #000; }
+        .ctrl-back  { background: transparent; color: #c9d1d9; border: 1px solid #252a35; text-decoration: none; display: inline-flex; align-items: center; }
+        .ctrl-back:hover { border-color: #4a9eff; color: #4a9eff; }
+        #status { font-family: 'IBM Plex Mono', monospace; font-size: 0.72rem; color: #6e7681; }
+
+        @media print {
+            .controls { display: none; }
+        }
+    </style>
+</head>
+<body>
+    <div class="controls">
+        <span id="status">Rendering barcodes…</span>
+        <button class="ctrl-btn ctrl-print" id="print-btn" onclick="window.print()" disabled>Print</button>
+        <a href="/labels" class="ctrl-btn ctrl-back">← Labels</a>
+    </div>
+
+    <div class="sheet">
+        <div class="labels-grid">
+            {% for uid in uids %}
+            <div class="label">
+                <div class="dm-wrap">
+                    <canvas data-uid="{{ uid }}"></canvas>
+                </div>
+                <div class="label-text">
+                    <div class="label-brand">{{ brand }}</div>
+                    <div class="label-uid">{{ uid }}</div>
+                </div>
+            </div>
+            {% endfor %}
+            {# Pad remaining cells so the grid holds its shape #}
+            {% for _ in range(80 - uids | length) %}
+            <div class="label"></div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bwip-js@3/dist/bwip-js-min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const canvases = document.querySelectorAll('.dm-wrap canvas[data-uid]');
+        let rendered = 0;
+        const total = canvases.length;
+
+        canvases.forEach(canvas => {
+            try {
+                bwipjs.toCanvas(canvas, {
+                    bcid:        'datamatrix',
+                    text:        canvas.dataset.uid,
+                    scale:        4,
+                    includetext: false,
+                    padding:     1,
+                });
+            } catch (e) {
+                console.error('bwip-js error for uid', canvas.dataset.uid, e);
+            }
+            rendered++;
+            if (rendered === total) {
+                document.getElementById('status').textContent =
+                    total + ' label' + (total !== 1 ? 's' : '') + ' ready';
+                document.getElementById('print-btn').disabled = false;
+            }
+        });
+
+        if (total === 0) {
+            document.getElementById('status').textContent = 'No UIDs — go back and generate some.';
+        }
+    });
+    </script>
+</body>
+</html>

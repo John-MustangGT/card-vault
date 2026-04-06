@@ -124,6 +124,7 @@
             <a href="/inventory" class="nav-link">Inventory</a>
             <a href="/sealed" class="nav-link">Sealed</a>
             <a href="/individuals" class="nav-link">Singles</a>
+            <a href="/labels" class="nav-link">Labels</a>
             <a href="/locations" class="nav-link">Locations</a>
             <a href="/market" class="nav-link active">Market</a>
             <a href="/sales" class="nav-link">Sales</a>
@@ -307,9 +308,9 @@
         <!-- Browse prices -->
         <div style="margin-bottom: 1.5rem;">
             <div class="section-title">Browse Prices</div>
-            <div style="display:flex; gap:0.75rem; margin-bottom:0.75rem; flex-wrap:wrap; align-items:center;">
+            <div style="display:flex; gap:0.75rem; margin-bottom:0.5rem; flex-wrap:wrap; align-items:center;">
                 <input id="browse-q" type="text" class="filter-input" placeholder="Card name…"
-                       style="flex:1; min-width:180px; max-width:360px"
+                       style="flex:1; min-width:180px; max-width:280px"
                        oninput="debouncedSearch()">
                 <select id="browse-set" class="filter-input" onchange="doSearch()">
                     <option value="">All sets</option>
@@ -317,6 +318,23 @@
                     <option value="{{ s.set_code }}">{{ s.set_code | upper }} — {{ s.set_name }}</option>
                     {% endfor %}
                 </select>
+                <select id="browse-rarity" class="filter-input" onchange="doSearch()" style="width:130px">
+                    <option value="">Any rarity</option>
+                    <option value="common">Common</option>
+                    <option value="uncommon">Uncommon</option>
+                    <option value="rare">Rare</option>
+                    <option value="mythic">Mythic</option>
+                </select>
+                <div style="display:flex; align-items:center; gap:0.35rem;">
+                    <span style="font-family:var(--mono); font-size:0.72rem; color:var(--text-dim)">$</span>
+                    <input id="browse-price-min" type="number" class="filter-input" placeholder="min"
+                           min="0" step="0.01" style="width:72px" oninput="debouncedSearch()">
+                    <span style="font-family:var(--mono); font-size:0.72rem; color:var(--text-dim)">–</span>
+                    <input id="browse-price-max" type="number" class="filter-input" placeholder="max"
+                           min="0" step="0.01" style="width:72px" oninput="debouncedSearch()">
+                </div>
+                <button class="btn btn-ghost" style="padding:0.35rem 0.65rem; font-size:0.72rem"
+                        onclick="clearBrowseFilters()">Clear</button>
                 <span id="browse-count" class="dim" style="font-family:var(--mono); font-size:0.75rem;"></span>
             </div>
             <div class="table-wrap">
@@ -333,7 +351,7 @@
                         </tr>
                     </thead>
                     <tbody id="browse-body">
-                        <tr><td colspan="7" class="empty-state">Enter a name or select a set to browse prices.</td></tr>
+                        <tr><td colspan="7" class="empty-state">Enter a name, select a set, or choose a rarity to browse prices.</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -391,28 +409,48 @@
         }
 
         async function doSearch() {
-            const q   = document.getElementById('browse-q').value.trim();
-            const set = document.getElementById('browse-set').value;
-            const body = document.getElementById('browse-body');
+            const q        = document.getElementById('browse-q').value.trim();
+            const set      = document.getElementById('browse-set').value;
+            const rarity   = document.getElementById('browse-rarity').value;
+            const priceMin = document.getElementById('browse-price-min').value.trim();
+            const priceMax = document.getElementById('browse-price-max').value.trim();
+            const body  = document.getElementById('browse-body');
             const count = document.getElementById('browse-count');
 
-            if (!q && !set) {
+            if (!q && !set && !rarity) {
                 _browseCards = [];
-                body.innerHTML = '<tr><td colspan="7" class="empty-state">Enter a name or select a set to browse prices.</td></tr>';
+                body.innerHTML = '<tr><td colspan="7" class="empty-state">Enter a name, select a set, or choose a rarity to browse prices.</td></tr>';
                 count.textContent = '';
                 return;
             }
 
             body.innerHTML = '<tr><td colspan="7" class="empty-state">Searching…</td></tr>';
-            const url = '/market/search?' + new URLSearchParams({ q, set });
+            const params = { q, set, rarity };
+            if (priceMin !== '') params.price_min = priceMin;
+            if (priceMax !== '') params.price_max = priceMax;
+            const url = '/market/search?' + new URLSearchParams(params);
             try {
                 const data = await fetch(url).then(r => r.json());
                 _browseCards = data.cards || [];
-                count.textContent = _browseCards.length === 50 ? '50 results (showing first 50)' : _browseCards.length + ' results';
+                count.textContent = _browseCards.length === 200
+                    ? '200 results (limit reached)'
+                    : _browseCards.length + ' result' + (_browseCards.length !== 1 ? 's' : '');
                 renderBrowse();
             } catch(e) {
                 body.innerHTML = '<tr><td colspan="7" class="empty-state">Search failed.</td></tr>';
             }
+        }
+
+        function clearBrowseFilters() {
+            document.getElementById('browse-q').value = '';
+            document.getElementById('browse-set').value = '';
+            document.getElementById('browse-rarity').value = '';
+            document.getElementById('browse-price-min').value = '';
+            document.getElementById('browse-price-max').value = '';
+            _browseCards = [];
+            document.getElementById('browse-body').innerHTML =
+                '<tr><td colspan="7" class="empty-state">Enter a name, select a set, or choose a rarity to browse prices.</td></tr>';
+            document.getElementById('browse-count').textContent = '';
         }
 
         function browseSort(key) {

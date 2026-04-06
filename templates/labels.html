@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Card Vault — Labels</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:#0d0f11; --surface:#151820; --border:#252a35; --accent:#4a9eff;
+            --accent-dim:#1e3a5f; --success:#2ea44f; --text:#c9d1d9; --text-dim:#6e7681;
+            --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif;
+        }
+        * { box-sizing:border-box; margin:0; padding:0; }
+        body { background:var(--bg); color:var(--text); font-family:var(--sans); min-height:100vh; }
+        nav { border-bottom:1px solid var(--border); padding:0 2rem; display:flex; align-items:center; gap:2rem; height:52px; }
+        .nav-brand { font-family:var(--mono); font-size:0.9rem; font-weight:600; color:var(--accent); letter-spacing:0.05em; text-decoration:none; }
+        .nav-links { display:flex; }
+        .nav-link { font-size:0.8rem; color:var(--text-dim); text-decoration:none; padding:0 1rem; height:52px; display:flex; align-items:center; border-bottom:2px solid transparent; font-family:var(--mono); }
+        .nav-link:hover { color:var(--text); }
+        .nav-link.active { color:var(--accent); border-bottom-color:var(--accent); }
+        main { padding:2rem; max-width:900px; margin:0 auto; }
+        .page-header { display:flex; align-items:baseline; gap:1rem; margin-bottom:1.5rem; }
+        .page-header h1 { font-family:var(--mono); font-size:1.1rem; font-weight:600; letter-spacing:0.05em; }
+
+        .summary-row { display:flex; gap:1rem; flex-wrap:wrap; margin-bottom:1.5rem; }
+        .tile { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:0.9rem 1.25rem; min-width:120px; }
+        .tile-label { font-family:var(--mono); font-size:0.65rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:0.3rem; }
+        .tile-val { font-family:var(--mono); font-size:1.1rem; font-weight:600; }
+        .tile-val.avail { color:var(--success); }
+        .tile-val.used  { color:var(--text-dim); }
+
+        .panel { background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:1.25rem 1.5rem; margin-bottom:1.5rem; }
+        .section-title { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.08em; margin-bottom:1rem; }
+        .form-row { display:flex; gap:0.75rem; flex-wrap:wrap; align-items:flex-end; }
+        .field { display:flex; flex-direction:column; gap:0.3rem; }
+        .field label { font-family:var(--mono); font-size:0.68rem; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.06em; }
+        .field input { background:var(--bg); border:1px solid var(--border); border-radius:4px; color:var(--text); font-family:var(--mono); font-size:0.78rem; padding:0.42rem 0.65rem; outline:none; }
+        .field input:focus { border-color:var(--accent); }
+        .btn { display:inline-flex; align-items:center; padding:0.45rem 1rem; background:var(--accent); color:#000; border:none; border-radius:4px; font-family:var(--mono); font-size:0.78rem; font-weight:600; cursor:pointer; text-decoration:none; }
+        .btn:hover { opacity:0.85; }
+        .btn-ghost { background:transparent; color:var(--text-dim); border:1px solid var(--border); color:var(--text); }
+        .btn-ghost:hover { border-color:var(--accent); color:var(--accent); }
+
+        .uid-grid { display:flex; flex-wrap:wrap; gap:0.4rem; margin-top:0.75rem; }
+        .uid-chip { font-family:var(--mono); font-size:0.75rem; font-weight:600; background:var(--accent-dim); color:var(--accent); padding:0.2rem 0.5rem; border-radius:3px; border:1px solid rgba(74,158,255,0.3); letter-spacing:0.06em; }
+        .uid-grid-more { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); display:flex; align-items:center; }
+        .note { font-family:var(--mono); font-size:0.72rem; color:var(--text-dim); margin-top:0.6rem; line-height:1.5; }
+    </style>
+</head>
+<body>
+    <nav>
+        <a href="/" class="nav-brand">CARD-VAULT</a>
+        <div class="nav-links">
+            <a href="/import" class="nav-link">Import</a>
+            <a href="/inventory" class="nav-link">Inventory</a>
+            <a href="/sealed" class="nav-link">Sealed</a>
+            <a href="/individuals" class="nav-link">Singles</a>
+            <a href="/locations" class="nav-link">Locations</a>
+            <a href="/market" class="nav-link">Market</a>
+            <a href="/labels" class="nav-link active">Labels</a>
+            <a href="/ledger" class="nav-link">Ledger</a>
+            <a href="/sales" class="nav-link">Sales</a>
+        </div>
+    </nav>
+
+    <main>
+        <div class="page-header">
+            <h1>// labels</h1>
+        </div>
+
+        <!-- Pool stats -->
+        <div class="summary-row">
+            <div class="tile">
+                <div class="tile-label">Available</div>
+                <div class="tile-val avail">{{ unused }}</div>
+            </div>
+            <div class="tile">
+                <div class="tile-label">Used</div>
+                <div class="tile-val used">{{ used }}</div>
+            </div>
+            <div class="tile">
+                <div class="tile-label">Total Generated</div>
+                <div class="tile-val">{{ total }}</div>
+            </div>
+        </div>
+
+        <!-- Generate -->
+        <div class="panel">
+            <div class="section-title">Generate UID Pool</div>
+            <form method="post" action="/labels/generate">
+                <div class="form-row">
+                    <div class="field">
+                        <label>Count</label>
+                        <input type="number" name="count" value="80" min="1" max="800" style="width:100px">
+                    </div>
+                    <div class="field" style="justify-content:flex-end">
+                        <button type="submit" class="btn">Generate</button>
+                    </div>
+                </div>
+            </form>
+            <p class="note">80 = one full Avery 8167 sheet. UIDs are unique 6-character base62 codes.</p>
+        </div>
+
+        <!-- Print -->
+        <div class="panel">
+            <div class="section-title">Print Labels — Avery 8167 (½" × 1¾", 4×20)</div>
+            <form method="get" action="/labels/print" target="_blank">
+                <div class="form-row">
+                    <div class="field" style="min-width:240px">
+                        <label>Brand / Vault Name</label>
+                        <input type="text" name="brand" value="Direwolf Card Vault" placeholder="e.g. Direwolf Card Vault">
+                    </div>
+                    <div class="field">
+                        <label>Label Count</label>
+                        <input type="number" name="count" value="{{ [unused, 80] | min }}" min="1" max="80" style="width:80px">
+                    </div>
+                    <div class="field" style="justify-content:flex-end">
+                        <button type="submit" class="btn btn-ghost">Open Print Sheet</button>
+                    </div>
+                </div>
+            </form>
+            <p class="note">Opens in a new tab. Use your browser's Print dialog (Ctrl+P / Cmd+P). Set paper to Letter, no scaling, no margins.</p>
+        </div>
+
+        <!-- Available UIDs -->
+        {% if pool_uids | length > 0 %}
+        <div class="panel">
+            <div class="section-title">Available UIDs ({{ unused }} total)</div>
+            <div class="uid-grid">
+                {% for uid in pool_uids %}
+                <span class="uid-chip">{{ uid }}</span>
+                {% endfor %}
+                {% if unused > pool_uids | length %}
+                <span class="uid-grid-more">… and {{ unused - pool_uids | length }} more</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </main>
+</body>
+</html>

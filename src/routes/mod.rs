@@ -1,6 +1,7 @@
 pub mod import;
 pub mod individuals;
 pub mod inventory;
+pub mod labels;
 pub mod ledger;
 pub mod locations;
 pub mod market;

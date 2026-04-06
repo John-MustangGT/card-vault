@@ -240,22 +240,29 @@ pub async fn trigger_import(State(state): State<Arc<AppState>>) -> Json<serde_js
     Json(serde_json::json!({ "ok": true, "message": "Import started in background" }))
 }
 
-/// GET /market/search?q=&set= — JSON price browse, returns up to 50 cards
+/// GET /market/search?q=&set=&rarity=&price_min=&price_max= — JSON price browse
 #[derive(Debug, Deserialize)]
 pub struct SearchQuery {
     pub q: Option<String>,
     pub set: Option<String>,
+    pub rarity: Option<String>,
+    pub price_min: Option<f64>,
+    pub price_max: Option<f64>,
 }
 
 pub async fn search_prices(
     State(state): State<Arc<AppState>>,
     Query(params): Query<SearchQuery>,
 ) -> Json<serde_json::Value> {
-    let q = params.q.as_deref().unwrap_or("").trim().to_string();
-    let set = params.set.as_deref().unwrap_or("").trim().to_string();
+    let q      = params.q.as_deref().unwrap_or("").trim().to_string();
+    let set    = params.set.as_deref().unwrap_or("").trim().to_string();
+    let rarity = params.rarity.as_deref().unwrap_or("").trim().to_string();
+    // -1.0 signals "no filter" — condition `? < 0` short-circuits the price clause
+    let price_min = params.price_min.unwrap_or(-1.0);
+    let price_max = params.price_max.unwrap_or(-1.0);
 
-    // Need at least a name fragment or a set to search
-    if q.is_empty() && set.is_empty() {
+    // Need at least a name fragment, set, or rarity to search
+    if q.is_empty() && set.is_empty() && rarity.is_empty() {
         return Json(serde_json::json!({ "cards": [] }));
     }
 
@@ -272,14 +279,18 @@ pub async fn search_prices(
             AND bp.import_id = (SELECT MAX(id) FROM scryfall_bulk_imports)
         WHERE (? = '' OR bc.name LIKE ?)
           AND (? = '' OR bc.set_code = ?)
+          AND (? = '' OR bc.rarity = ?)
+          AND (? < 0 OR bp.price_usd >= ?)
+          AND (? < 0 OR bp.price_usd <= ?)
         ORDER BY bc.name, bc.set_code, CAST(bc.collector_number AS INTEGER)
-        LIMIT 50
+        LIMIT 200
         "#,
     )
-    .bind(&q)
-    .bind(&like_q)
-    .bind(&set)
-    .bind(&set)
+    .bind(&q).bind(&like_q)
+    .bind(&set).bind(&set)
+    .bind(&rarity).bind(&rarity)
+    .bind(price_min).bind(price_min)
+    .bind(price_max).bind(price_max)
     .fetch_all(&state.pool)
     .await
     .unwrap_or_default();

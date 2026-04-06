@@ -79,6 +79,7 @@
             <a href="/inventory" class="nav-link active">Inventory</a>
             <a href="/sealed" class="nav-link">Sealed</a>
             <a href="/individuals" class="nav-link">Singles</a>
+            <a href="/labels" class="nav-link">Labels</a>
             <a href="/locations" class="nav-link">Locations</a>
             <a href="/market" class="nav-link">Market</a>
             <a href="/ledger" class="nav-link">Ledger</a>
@@ -137,7 +138,7 @@
                 <div class="empty-state">No singles tracked yet.</div>
                 {% else %}
                 <table>
-                    <thead><tr><th>ID</th><th>Condition</th><th>Finish</th><th>Status</th><th>Location</th><th>Cost</th><th></th></tr></thead>
+                    <thead><tr><th>ID</th><th>Condition</th><th>Finish</th><th>Status</th><th>Location</th><th>Cost</th><th>Scans</th><th></th></tr></thead>
                     <tbody>
                     {% for ind in individuals %}
                     <tr>
@@ -155,7 +156,24 @@
                         <td style="font-family:var(--mono); font-size:0.78rem; color:var(--text-dim)">
                             {% if ind.acquisition_cost %}${{ (ind.acquisition_cost)|usd }}{% else %}—{% endif %}
                         </td>
-                        <td>
+                        <td style="white-space:nowrap">
+                            {% if ind.scan_front_path %}
+                            <a href="/scans/{{ ind.scan_front_path }}" target="_blank" title="Front scan">
+                                <img src="/scans/{{ ind.scan_front_path }}" alt="front"
+                                     style="height:38px; width:auto; border-radius:2px; border:1px solid var(--border); margin-right:3px; vertical-align:middle">
+                            </a>
+                            {% endif %}
+                            {% if ind.scan_back_path %}
+                            <a href="/scans/{{ ind.scan_back_path }}" target="_blank" title="Back scan">
+                                <img src="/scans/{{ ind.scan_back_path }}" alt="back"
+                                     style="height:38px; width:auto; border-radius:2px; border:1px solid var(--border); vertical-align:middle">
+                            </a>
+                            {% endif %}
+                            {% if not ind.scan_front_path and not ind.scan_back_path %}
+                            <span style="color:var(--text-dim); font-size:0.75rem">—</span>
+                            {% endif %}
+                        </td>
+                        <td style="white-space:nowrap">
                             <form method="post" action="/individuals/{{ ind.id }}/status" style="display:inline-flex; gap:0.4rem; align-items:center">
                                 <select name="status" class="status-select">
                                     {% for s in ["in_stock","listed","out_for_grading","graded","sold"] %}
@@ -164,6 +182,8 @@
                                 </select>
                                 <button type="submit" class="btn btn-sm btn-ghost">Save</button>
                             </form>
+                            <button class="btn btn-sm btn-danger" style="margin-left:0.4rem"
+                                    onclick="deleteIndividual('{{ ind.id }}', this)">Delete</button>
                         </td>
                     </tr>
                     {% endfor %}
@@ -175,13 +195,17 @@
             <!-- Track new single -->
             <div class="panel">
                 <div class="section-title" style="margin-bottom:1rem">Track New Single</div>
-                <form method="post" action="/inventory/card/{{ card.scryfall_id }}/individual">
+                <form method="post" action="/inventory/card/{{ card.scryfall_id }}/individual" enctype="multipart/form-data">
                     <div class="form-row">
                         <div class="field">
                             <label>ID (base62, ≤6 chars)</label>
-                            <input type="text" name="card_id" maxlength="6" pattern="[0-9A-Za-z]{1,6}"
-                                   placeholder="auto" style="width:90px; font-family:var(--mono)"
-                                   title="Paste scanned QR code — leave blank to auto-generate">
+                            <div style="display:flex; gap:0.35rem; align-items:center">
+                                <input type="text" id="card_id_input" name="card_id" maxlength="6" pattern="[0-9A-Za-z]{1,6}"
+                                       placeholder="auto" style="width:90px; font-family:var(--mono)"
+                                       title="Paste scanned QR code, click Next UID, or leave blank to auto-generate">
+                                <button type="button" class="btn btn-ghost" style="padding:0.35rem 0.6rem; font-size:0.7rem"
+                                        onclick="fillNextUid()" title="Fill from pre-generated label pool">Next UID</button>
+                            </div>
                         </div>
                         <div class="field">
                             <label>Condition</label>
@@ -217,10 +241,57 @@
                         <label>Notes</label>
                         <input type="text" name="notes" placeholder="optional" style="width:360px">
                     </div>
+                    <div class="form-row" style="margin-bottom:1rem">
+                        <div class="field">
+                            <label>Front Scan</label>
+                            <input type="file" name="scan_front" accept="image/*"
+                                   style="font-family:var(--mono); font-size:0.75rem; color:var(--text-dim)">
+                        </div>
+                        <div class="field">
+                            <label>Back Scan</label>
+                            <input type="file" name="scan_back" accept="image/*"
+                                   style="font-family:var(--mono); font-size:0.75rem; color:var(--text-dim)">
+                        </div>
+                    </div>
                     <button type="submit" class="btn">Track Single</button>
                 </form>
             </div>
         </div>
     </main>
+    <script>
+        async function deleteIndividual(id, btn) {
+            if (!confirm('Delete tracked single ' + id + '? This cannot be undone.')) return;
+            btn.disabled = true;
+            try {
+                const r = await fetch('/individuals/' + id + '/delete', { method: 'POST' });
+                const d = await r.json();
+                if (d.ok) {
+                    btn.closest('tr').remove();
+                } else {
+                    alert('Delete failed: ' + (d.error || 'unknown error'));
+                    btn.disabled = false;
+                }
+            } catch(e) {
+                alert('Request failed.');
+                btn.disabled = false;
+            }
+        }
+
+        async function fillNextUid() {
+            const input = document.getElementById('card_id_input');
+            try {
+                const r = await fetch('/labels/next-uid');
+                const d = await r.json();
+                if (d.ok && d.uid) {
+                    input.value = d.uid;
+                    input.style.borderColor = 'var(--accent)';
+                } else {
+                    alert('No UIDs available in pool. Go to /labels to generate some.');
+                }
+            } catch (e) {
+                alert('Failed to fetch next UID.');
+            }
+        }
+    </script>
 </body>
 </html>
