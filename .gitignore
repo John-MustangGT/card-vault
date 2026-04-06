@@ -24,8 +24,12 @@ target
 .env
 Cargo.lock
 card-vault.db
+<<<<<<< HEAD
 .claude/
 card-vault.db-shm
 card-vault.db-wal
 data/all-cards-*.json.gz
 
+=======
+data/*.json.gz
+>>>>>>> 1b7c88b (updated gitignore)
