@@ -99,6 +99,8 @@ async fn main() -> Result<()> {
         .route("/market/import", post(routes::market::trigger_import))
         .route("/market/search", get(routes::market::search_prices))
         .route("/market/clear", post(routes::market::clear_market))
+        // Scanner ingest API
+        .route("/api/ingest", post(routes::ingest::ingest))
         .route("/sales", get(routes::sales::sales_page))
         .route("/sales", post(routes::sales::create_sale))
         .route("/sales/autocomplete", get(routes::sales::inventory_autocomplete))

@@ -1,5 +1,6 @@
 pub mod import;
 pub mod individuals;
+pub mod ingest;
 pub mod inventory;
 pub mod labels;
 pub mod ledger;
