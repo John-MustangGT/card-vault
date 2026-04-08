@@ -460,6 +460,8 @@ def load_db_path(override: str | None) -> str:
 
 
 def main():
+    global MATCH_THRESHOLD
+
     parser = argparse.ArgumentParser(description="MTG card recognition for Elmo OX-1 / FI-8040")
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -494,7 +496,6 @@ def main():
         sys.exit(1)
 
     # Override global threshold if specified
-    global MATCH_THRESHOLD
     MATCH_THRESHOLD = args.threshold
 
     index = HashIndex(db_path)
