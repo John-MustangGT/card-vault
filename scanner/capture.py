@@ -28,6 +28,7 @@ Front + Back workflow:
 """
 
 import argparse
+import platform
 import os
 import re
 import sys
@@ -105,17 +106,41 @@ STATE_DONE        = "done"        # pair complete, waiting for card removal
 # Camera enumeration
 # ---------------------------------------------------------------------------
 
+def _cam_backend() -> int:
+    """Return the best OpenCV camera backend for the current platform."""
+    if platform.system() == "Windows":
+        return cv2.CAP_DSHOW
+    elif platform.system() == "Linux":
+        return cv2.CAP_V4L2
+    return cv2.CAP_ANY
+
+
+def _v4l2_devices() -> list[str]:
+    """Return /dev/video* device paths present on Linux."""
+    import glob
+    return sorted(glob.glob("/dev/video*"))
+
+
 def list_cameras(max_index: int = 10) -> list[dict]:
     """Probe device indices 0..max_index-1 and return info on working ones."""
     found = []
+    backend = _cam_backend()
+
+    if platform.system() == "Linux":
+        devs = _v4l2_devices()
+        print(f"V4L2 devices: {devs if devs else 'none found'}")
+        if not devs:
+            print("  OX-1 connected? Check: lsusb  and  ls /dev/video*")
+            print("  May need: sudo apt install v4l-utils  then  v4l2-ctl --list-devices")
+
     print("Scanning for cameras...")
     for i in range(max_index):
-        cap = cv2.VideoCapture(i, cv2.CAP_DSHOW)
+        cap = cv2.VideoCapture(i, backend)
         if cap.isOpened():
             ret, _ = cap.read()
             if ret:
-                w  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-                h  = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                w   = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                h   = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
                 fps = cap.get(cv2.CAP_PROP_FPS)
                 found.append({"index": i, "width": w, "height": h, "fps": fps})
                 print(f"  [{i}] {w}×{h} @ {fps:.0f}fps")
@@ -124,13 +149,17 @@ def list_cameras(max_index: int = 10) -> list[dict]:
             cap.release()
     if not found:
         print("  No cameras found.")
+        if platform.system() == "Linux":
+            print("  Try: sudo usermod -aG video $USER  then log out and back in")
     return found
 
 
 def open_camera(index: int, width: int = 0, height: int = 0) -> cv2.VideoCapture:
-    """Open a camera by index, preferring DirectShow on Windows."""
-    cap = cv2.VideoCapture(index, cv2.CAP_DSHOW)
+    """Open a camera by index using the platform-appropriate backend."""
+    backend = _cam_backend()
+    cap = cv2.VideoCapture(index, backend)
     if not cap.isOpened():
+        # Fallback: let OpenCV pick
         cap = cv2.VideoCapture(index)
     if not cap.isOpened():
         raise RuntimeError(f"Cannot open camera index {index}")
