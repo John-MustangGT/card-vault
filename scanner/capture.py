@@ -599,6 +599,8 @@ def run_capture(args):
 # ---------------------------------------------------------------------------
 
 def main():
+    global STABLE_FRAMES_NEEDED, STABLE_DIFF_THRESHOLD
+
     parser = argparse.ArgumentParser(
         description="Live camera capture for Elmo OX-1 / card-vault",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -641,7 +643,6 @@ def main():
     # Apply tuning overrides
     import recognize as rec_mod
     rec_mod.MATCH_THRESHOLD = args.threshold
-    global STABLE_FRAMES_NEEDED, STABLE_DIFF_THRESHOLD
     STABLE_FRAMES_NEEDED  = args.stable_frames
     STABLE_DIFF_THRESHOLD = args.stable_diff
 
