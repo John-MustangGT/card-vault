@@ -1,0 +1,77 @@
+<style>
+    body { padding-bottom: 2.4rem; }
+    #status-footer {
+        position: fixed; left: 0; right: 0; bottom: 0; z-index: 150;
+        display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 1.5rem;
+        padding: 0.45rem 2rem;
+        background: #0a0c0e; border-top: 1px solid #252a35;
+        font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; color: #6e7681;
+    }
+    #status-footer .sf-item b { color: #c9d1d9; font-weight: 500; }
+    #status-footer .sf-spacer { flex: 1; }
+    #status-footer .sf-build { color: #6e7681; }
+    #status-footer .sf-dirty { color: #ffc84a; }
+    @media print { #status-footer { display: none; } body { padding-bottom: 0; } }
+</style>
+<footer id="status-footer">
+    {% if filter_cards is defined %}
+    <span class="sf-item" title="Cards (sum of quantities) matching the current filters">In filter: <b>{{ filter_cards }}</b> cards / {{ total }} lots</span>
+    {% endif %}
+    <span class="sf-item" title="Sum of quantities across all inventory lots">Total cards: <b id="sf-total">…</b></span>
+    <span class="sf-item" title="Distinct printings (Scryfall IDs) in stock">Unique cards: <b id="sf-unique">…</b></span>
+    <span class="sf-item" id="sf-price-wrap">Prices updated: <b id="sf-price">…</b></span>
+    <span class="sf-spacer"></span>
+    <span class="sf-item sf-build" id="sf-build" title=""></span>
+    <span class="sf-item"><b id="sf-clock"></b></span>
+</footer>
+<script>
+(function () {
+    const $ = id => document.getElementById(id);
+    const fmt = new Intl.NumberFormat();
+    const ago = ts => {
+        const s = Math.max(0, Math.floor(Date.now() / 1000 - ts));
+        if (s < 60) return 'just now';
+        if (s < 3600) return Math.floor(s / 60) + 'm ago';
+        if (s < 86400) return Math.floor(s / 3600) + 'h ago';
+        return Math.floor(s / 86400) + 'd ago';
+    };
+    let priceTs = null;
+
+    function tick() {
+        $('sf-clock').textContent = new Date().toLocaleString([], {
+            year: 'numeric', month: 'short', day: 'numeric',
+            hour: '2-digit', minute: '2-digit', second: '2-digit',
+        });
+        if (priceTs) $('sf-price').textContent = new Date(priceTs * 1000).toLocaleString([], {
+            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
+        }) + ' (' + ago(priceTs) + ')';
+    }
+
+    async function load() {
+        try {
+            const d = await (await fetch('/api/status')).json();
+            $('sf-total').textContent = fmt.format(d.total_cards);
+            $('sf-unique').textContent = fmt.format(d.unique_cards);
+            priceTs = d.last_price_update;
+            if (!priceTs) $('sf-price').textContent = 'never';
+            else $('sf-price-wrap').title = 'Source: ' + d.last_price_source;
+            const b = d.build;
+            const el = $('sf-build');
+            el.innerHTML = 'v' + b.version + ' · ' + b.branch + '@' + b.sha +
+                (b.dirty ? ' <span class="sf-dirty">(modified)</span>' : '');
+            el.title = 'Built ' + new Date(b.built_at * 1000).toLocaleString();
+            tick();
+        } catch (e) { /* leave placeholders */ }
+    }
+
+    // The footer is fixed and may wrap on narrow screens; keep page content clear of it
+    const pad = () => { document.body.style.paddingBottom = $('status-footer').offsetHeight + 'px'; };
+    window.addEventListener('resize', pad);
+
+    load().then(pad);
+    tick();
+    pad();
+    setInterval(tick, 1000);
+    setInterval(load, 60000);
+})();
+</script>

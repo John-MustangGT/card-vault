@@ -411,6 +411,7 @@ async fn deduct_lot(
         "SELECT il.id FROM inventory_lots il
          JOIN scryfall_cards sc ON sc.scryfall_id = il.scryfall_id
          WHERE sc.name = ? AND LOWER(sc.set_code) = LOWER(?) AND il.condition = ? AND il.foil = ?
+         ORDER BY (il.quantity > 0) DESC, il.id
          LIMIT 1",
     )
     .bind(name)

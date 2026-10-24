@@ -58,7 +58,7 @@ scans/                    # Card scan images (configurable via .env)
 See `migrations/0001_initial.sql` for full DDL. Key tables:
 
 - **`scryfall_cards`** — cached Scryfall data, keyed on `scryfall_id` (UUID). Each language/printing is a unique ID.
-- **`inventory_lots`** — bulk quantity tracking. `UNIQUE(scryfall_id, foil, condition)`. Re-imports accumulate quantities.
+- **`inventory_lots`** — bulk quantity tracking. One lot per (card, finish, condition, location) — unique index `idx_lots_identity`. Re-imports into the same location accumulate quantities; imports default to a new random "chaos" location (`CHAOS-XXXXXXXX`, type `chaos`). Moving a lot onto an identical lot merges them.
 - **`individual_cards`** — high-value singles. PK is a 6-char base62 ID (e.g. `aB3xK9`) printed as QR code on Avery 5267 labels. Statuses: `in_stock | listed | out_for_grading | graded | sold`
 - **`storage_locations`** — physical binders/boxes. Type: `binder | box`
 - **`price_history`** — time-series price snapshots from Scryfall/TCGPlayer

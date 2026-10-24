@@ -111,7 +111,11 @@ pub struct ImportResult {
     pub errors: Vec<String>,
 }
 
-pub async fn import_cardsphere_csv(pool: &SqlitePool, csv_data: &str) -> Result<ImportResult> {
+pub async fn import_cardsphere_csv(
+    pool: &SqlitePool,
+    csv_data: &str,
+    location_id: Option<i64>,
+) -> Result<ImportResult> {
     let mut result = ImportResult::default();
     let now = unix_now();
 
@@ -186,9 +190,9 @@ pub async fn import_cardsphere_csv(pool: &SqlitePool, csv_data: &str) -> Result<
             r#"
             INSERT INTO inventory_lots
                 (scryfall_id, foil, condition, quantity, acquisition_currency,
-                 tags, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 'USD', ?, ?, ?)
-            ON CONFLICT(scryfall_id, foil, condition) DO UPDATE SET
+                 tags, location_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, 'USD', ?, ?, ?, ?)
+            ON CONFLICT(scryfall_id, foil, condition, COALESCE(location_id, 0)) DO UPDATE SET
                 quantity   = quantity + excluded.quantity,
                 tags       = COALESCE(excluded.tags, tags),
                 updated_at = excluded.updated_at
@@ -199,6 +203,7 @@ pub async fn import_cardsphere_csv(pool: &SqlitePool, csv_data: &str) -> Result<
         .bind(condition)
         .bind(row.count)
         .bind(&tags_json)
+        .bind(location_id)
         .bind(now)
         .bind(now)
         .execute(pool)
@@ -218,7 +223,11 @@ pub async fn import_cardsphere_csv(pool: &SqlitePool, csv_data: &str) -> Result<
     Ok(result)
 }
 
-pub async fn import_manabox_csv(pool: &SqlitePool, csv_data: &str) -> Result<ImportResult> {
+pub async fn import_manabox_csv(
+    pool: &SqlitePool,
+    csv_data: &str,
+    location_id: Option<i64>,
+) -> Result<ImportResult> {
     let mut result = ImportResult::default();
     let now = unix_now();
 
@@ -291,9 +300,9 @@ pub async fn import_manabox_csv(pool: &SqlitePool, csv_data: &str) -> Result<Imp
             r#"
             INSERT INTO inventory_lots
                 (scryfall_id, foil, condition, quantity, acquisition_cost,
-                 acquisition_currency, manabox_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(scryfall_id, foil, condition) DO UPDATE SET
+                 acquisition_currency, manabox_id, location_id, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(scryfall_id, foil, condition, COALESCE(location_id, 0)) DO UPDATE SET
                 quantity             = quantity + excluded.quantity,
                 acquisition_cost     = COALESCE(acquisition_cost, excluded.acquisition_cost),
                 manabox_id           = COALESCE(manabox_id, excluded.manabox_id),
@@ -307,6 +316,7 @@ pub async fn import_manabox_csv(pool: &SqlitePool, csv_data: &str) -> Result<Imp
         .bind(acquisition_cost)
         .bind(&currency)
         .bind(row.manabox_id)
+        .bind(location_id)
         .bind(now)
         .bind(now)
         .execute(pool)

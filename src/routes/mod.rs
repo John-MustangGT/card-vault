@@ -8,3 +8,4 @@ pub mod locations;
 pub mod market;
 pub mod sales;
 pub mod sealed;
+pub mod status;

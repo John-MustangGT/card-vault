@@ -99,12 +99,8 @@
             flex: 1;
         }
 
-        th.sortable {
-            cursor: pointer;
-            user-select: none;
-        }
-
-        th.sortable:hover { color: var(--text); }
+        th a.sort-link { color: inherit; text-decoration: none; }
+        th a.sort-link:hover { color: var(--text); }
         th.sort-active { color: var(--accent); }
 
         .sort-icon { opacity: 0.5; font-size: 0.65rem; }
@@ -163,6 +159,23 @@
         }
 
         .btn-ghost:hover { color: var(--text); border-color: var(--text-dim); }
+
+        /* Pagination */
+        .pager { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1rem; }
+        .pager-row { display: flex; flex-wrap: wrap; gap: 0.25rem; align-items: center; }
+        .pg, .pg-letter {
+            display: inline-flex; align-items: center; justify-content: center;
+            min-width: 1.9rem; height: 1.9rem; padding: 0 0.5rem;
+            border: 1px solid var(--border); border-radius: 4px; background: var(--surface);
+            color: var(--text-dim); font-family: var(--mono); font-size: 0.74rem; text-decoration: none;
+        }
+        .pg-letter { min-width: 1.6rem; padding: 0 0.3rem; }
+        a.pg:hover, a.pg-letter:hover { color: var(--text); border-color: var(--text-dim); }
+        .pg.current, .pg-letter.current { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+        .pg.disabled, .pg-letter.disabled { opacity: 0.3; background: transparent; }
+        .pg-gap { color: var(--text-dim); font-family: var(--mono); padding: 0 0.3rem; }
+        .pager-label { font-family: var(--mono); font-size: 0.66rem; color: var(--text-dim);
+                       text-transform: uppercase; letter-spacing: 0.08em; margin-right: 0.5rem; }
 
         /* Table */
         .table-wrap {
@@ -280,7 +293,7 @@
 
         /* Bulk action bar */
         #bulk-bar {
-            display: none; position: fixed; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+            display: none; position: fixed; bottom: 3.5rem; left: 50%; transform: translateX(-50%);
             background: var(--surface); border: 1px solid var(--accent); border-radius: 8px;
             padding: 0.65rem 1.25rem; display: none; align-items: center; gap: 1rem;
             box-shadow: 0 4px 24px rgba(0,0,0,0.5); z-index: 200; white-space: nowrap;
@@ -309,10 +322,36 @@
         </div>
     </nav>
 
+    {% macro pager(letters, pages, prev_href, next_href) %}
+        <div class="pager">
+            {% if letters | length > 0 %}
+            <div class="pager-row">
+                <span class="pager-label">Jump to</span>
+                {% for l in letters %}
+                    {% if l.href %}<a class="pg-letter{% if l.current %} current{% endif %}" href="{{ l.href }}">{{ l.label }}</a>
+                    {% else %}<span class="pg-letter disabled">{{ l.label }}</span>{% endif %}
+                {% endfor %}
+            </div>
+            {% endif %}
+            <div class="pager-row">
+                {% if prev_href %}<a class="pg" href="{{ prev_href }}">‹ Prev</a>{% else %}<span class="pg disabled">‹ Prev</span>{% endif %}
+                {% for p in pages %}
+                    {% if p.gap %}<span class="pg-gap">…</span>
+                    {% elif p.current %}<span class="pg current">{{ p.label }}</span>
+                    {% else %}<a class="pg" href="{{ p.href }}">{{ p.label }}</a>{% endif %}
+                {% endfor %}
+                {% if next_href %}<a class="pg" href="{{ next_href }}">Next ›</a>{% else %}<span class="pg disabled">Next ›</span>{% endif %}
+            </div>
+        </div>
+    {% endmacro %}
+
     <main>
         <div class="page-header">
             <h1>// inventory</h1>
-            <span class="row-count">{{ rows | length }} lots</span>
+            <span class="row-count">
+                {% if total == 0 %}0 lots{% else %}{{ first_shown }}–{{ last_shown }} of {{ total }} lots{% endif %}
+                {% if total_pages > 1 %} · page {{ page }} of {{ total_pages }}{% endif %}
+            </span>
             <button id="refresh-btn" class="btn btn-ghost" onclick="refreshPrices()" style="margin-left:auto">
                 ↻ Refresh Prices
             </button>
@@ -320,7 +359,19 @@
 
         <form class="filters" method="get" action="/inventory">
             <input class="filter-input" type="text" name="q" placeholder="Search name…" value="{{ filter_q }}">
-            <input class="filter-input" type="text" name="set" placeholder="Set code…" value="{{ filter_set }}" style="width:110px">
+            <select class="filter-input" name="set" style="max-width:260px">
+                <option value="">All sets</option>
+                {% for st in sets %}
+                <option value="{{ st.code }}" {% if filter_set == st.code %}selected{% endif %}>{{ st.label }}</option>
+                {% endfor %}
+            </select>
+            <select class="filter-input" name="location" style="max-width:220px">
+                <option value="">All locations</option>
+                {% if has_unassigned %}<option value="none" {% if filter_location == "none" %}selected{% endif %}>— no location —</option>{% endif %}
+                {% for loc in locations %}
+                <option value="{{ loc.id }}" {% if filter_location == "" ~ loc.id %}selected{% endif %}>{{ loc.name }} ({{ loc.lots }})</option>
+                {% endfor %}
+            </select>
             <select class="filter-input" name="condition">
                 <option value="">All conditions</option>
                 {% for cond in ["near_mint","lightly_played","moderately_played","heavily_played","damaged"] %}
@@ -333,11 +384,22 @@
                 <option value="{{ f }}" {% if filter_foil == f %}selected{% endif %}>{{ f }}</option>
                 {% endfor %}
             </select>
+            <select class="filter-input" name="per_page" title="Cards per page" onchange="this.form.submit()">
+                {% for n in per_page_options %}
+                <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{% if n == "all" %}Show all{% else %}{{ n }} per page{% endif %}</option>
+                {% endfor %}
+            </select>
+            {% if sort != "name" or desc %}
+            <input type="hidden" name="sort" value="{{ sort }}">
+            {% if desc %}<input type="hidden" name="dir" value="desc">{% endif %}
+            {% endif %}
             <button type="submit" class="btn">Filter</button>
-            {% if filter_q or filter_set or filter_condition or filter_foil %}
+            {% if has_filters %}
             <a href="/inventory" class="btn btn-ghost">Clear</a>
             {% endif %}
         </form>
+
+        {% if total_pages > 1 %}{{ pager(letters, pages, prev_href, next_href) }}{% endif %}
 
         <div class="table-wrap">
             {% if rows | length == 0 %}
@@ -347,14 +409,14 @@
                 <thead>
                     <tr>
                         <th class="cb-col"><input type="checkbox" id="chk-all" onchange="toggleAll(this)"></th>
-                        <th class="sortable" onclick="sortTable(1,false)">Name<span class="sort-icon"> ⇅</span></th>
-                        <th class="sortable" onclick="sortTable(2,false)">Set<span class="sort-icon"> ⇅</span></th>
-                        <th class="sortable" onclick="sortTable(3,false)">Finish<span class="sort-icon"> ⇅</span></th>
-                        <th class="sortable" onclick="sortTable(4,false)">Condition<span class="sort-icon"> ⇅</span></th>
-                        <th class="sortable" onclick="sortTable(5,true)">Qty<span class="sort-icon"> ⇅</span></th>
-                        <th class="sortable" onclick="sortTable(6,false)">Location<span class="sort-icon"> ⇅</span></th>
-                        <th class="sortable" onclick="sortTable(7,true)">Market $<span class="sort-icon"> ⇅</span></th>
-                        <th class="sortable" onclick="sortTable(8,true)">Shop $<span class="sort-icon"> ⇅</span></th>
+                        <th class="sortable{% if sort_links[0].active %} sort-active{% endif %}"><a class="sort-link" href="{{ sort_links[0].href }}">Name<span class="sort-icon">{% if sort_links[0].active %}{% if sort_links[0].desc %} ▼{% else %} ▲{% endif %}{% else %} ⇅{% endif %}</span></a></th>
+                        <th class="sortable{% if sort_links[1].active %} sort-active{% endif %}"><a class="sort-link" href="{{ sort_links[1].href }}">Set<span class="sort-icon">{% if sort_links[1].active %}{% if sort_links[1].desc %} ▼{% else %} ▲{% endif %}{% else %} ⇅{% endif %}</span></a></th>
+                        <th class="sortable{% if sort_links[2].active %} sort-active{% endif %}"><a class="sort-link" href="{{ sort_links[2].href }}">Finish<span class="sort-icon">{% if sort_links[2].active %}{% if sort_links[2].desc %} ▼{% else %} ▲{% endif %}{% else %} ⇅{% endif %}</span></a></th>
+                        <th class="sortable{% if sort_links[3].active %} sort-active{% endif %}"><a class="sort-link" href="{{ sort_links[3].href }}">Condition<span class="sort-icon">{% if sort_links[3].active %}{% if sort_links[3].desc %} ▼{% else %} ▲{% endif %}{% else %} ⇅{% endif %}</span></a></th>
+                        <th class="sortable{% if sort_links[4].active %} sort-active{% endif %}"><a class="sort-link" href="{{ sort_links[4].href }}">Qty<span class="sort-icon">{% if sort_links[4].active %}{% if sort_links[4].desc %} ▼{% else %} ▲{% endif %}{% else %} ⇅{% endif %}</span></a></th>
+                        <th class="sortable{% if sort_links[5].active %} sort-active{% endif %}"><a class="sort-link" href="{{ sort_links[5].href }}">Location<span class="sort-icon">{% if sort_links[5].active %}{% if sort_links[5].desc %} ▼{% else %} ▲{% endif %}{% else %} ⇅{% endif %}</span></a></th>
+                        <th class="sortable{% if sort_links[6].active %} sort-active{% endif %}"><a class="sort-link" href="{{ sort_links[6].href }}">Market $<span class="sort-icon">{% if sort_links[6].active %}{% if sort_links[6].desc %} ▼{% else %} ▲{% endif %}{% else %} ⇅{% endif %}</span></a></th>
+                        <th class="sortable{% if sort_links[7].active %} sort-active{% endif %}"><a class="sort-link" href="{{ sort_links[7].href }}">Shop $<span class="sort-icon">{% if sort_links[7].active %}{% if sort_links[7].desc %} ▼{% else %} ▲{% endif %}{% else %} ⇅{% endif %}</span></a></th>
                         <th></th>
                     </tr>
                 </thead>
@@ -405,6 +467,8 @@
             {% endif %}
         </div>
 
+        {% if total_pages > 1 %}<div style="margin-top:1rem">{{ pager(letters, pages, prev_href, next_href) }}</div>{% endif %}
+
         <!-- Bulk action bar -->
         <div id="bulk-bar">
             <span class="bulk-count" id="bulk-count">0 selected</span>
@@ -433,35 +497,6 @@
                 name: tr.cells[1]?.textContent?.trim() || '',
             })).filter(l => l.id > 0);
             return _locations;
-        }
-
-        // ── Column sort ──────────────────────────────────────────────────────
-        let _sortCol = -1, _sortAsc = true;
-
-        function sortTable(col, isNum) {
-            const tbody = document.querySelector('#inv-table tbody');
-            if (!tbody) return;
-            const rows = [...tbody.querySelectorAll('tr.inv-row')];
-            _sortAsc = (_sortCol === col) ? !_sortAsc : true;
-            _sortCol = col;
-            rows.sort((a, b) => {
-                const av = a.cells[col].dataset.val ?? a.cells[col].textContent.trim();
-                const bv = b.cells[col].dataset.val ?? b.cells[col].textContent.trim();
-                const cmp = isNum ? (parseFloat(av)||0)-(parseFloat(bv)||0) : av.localeCompare(bv);
-                return _sortAsc ? cmp : -cmp;
-            });
-            // Re-insert display rows only (preserve any open edit rows)
-            rows.forEach(r => {
-                const edit = document.getElementById('edit-row-' + r.dataset.lotId);
-                tbody.appendChild(r);
-                if (edit) tbody.appendChild(edit);
-            });
-            document.querySelectorAll('th.sortable').forEach((th, i) => {
-                const icon = th.querySelector('.sort-icon');
-                const active = (i === col);
-                th.classList.toggle('sort-active', active);
-                icon.textContent = active ? (_sortAsc ? ' ▲' : ' ▼') : ' ⇅';
-            });
         }
 
         // ── Quick ±1 qty ─────────────────────────────────────────────────────
@@ -581,6 +616,7 @@
             });
             const res = await r.json();
             if (!res.ok) { alert('Save failed: ' + res.error); return; }
+            if (res.merged) { location.reload(); return; }  // folded into an identical lot
 
             // Update display row values
             const cells = tr.cells;
@@ -657,7 +693,9 @@
                 body: JSON.stringify({ lot_ids: ids, location_id }),
             });
             const d = await r.json();
-            if (d.ok) {
+            if (d.ok && d.merged > 0) {
+                location.reload();  // some lots were folded into identical ones
+            } else if (d.ok) {
                 // Update location cells in-place
                 const locName = location_id
                     ? document.getElementById('bulk-loc').options[document.getElementById('bulk-loc').selectedIndex].text
@@ -696,5 +734,6 @@
             } catch(e) { btn.textContent = 'Network error'; btn.disabled = false; }
         }
     </script>
+    {% include "_footer.html" %}
 </body>
 </html>

@@ -52,6 +52,8 @@ async fn main() -> Result<()> {
         env,
     });
 
+    db::sets::spawn_ensure_sets(state.pool.clone());
+
     // ── Background bulk import task (runs immediately, then every 30 min) ───
     {
         let bg_pool = state.pool.clone();
@@ -101,6 +103,7 @@ async fn main() -> Result<()> {
         .route("/market/clear", post(routes::market::clear_market))
         // Scanner ingest API
         .route("/api/ingest", post(routes::ingest::ingest))
+        .route("/api/status", get(routes::status::status))
         .route("/sales", get(routes::sales::sales_page))
         .route("/sales", post(routes::sales::create_sale))
         .route("/sales/autocomplete", get(routes::sales::inventory_autocomplete))

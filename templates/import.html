@@ -218,6 +218,36 @@
             background: var(--accent-dim);
         }
 
+        .dest-panel {
+            display: none;
+            margin-top: 0.75rem;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .dest-panel.active { display: flex; }
+
+        .dest-note {
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            line-height: 1.5;
+        }
+
+        .dest-input {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text);
+            font-family: var(--mono);
+            font-size: 0.78rem;
+            padding: 0.5rem 0.75rem;
+            outline: none;
+        }
+
+        .dest-input:focus { border-color: var(--accent); }
+        select.dest-input { flex: 1; }
+        input.dest-input { flex: 1; }
+
         .submit-row {
             margin-top: 1.5rem;
             display: flex;
@@ -351,7 +381,7 @@
         <div class="import-container">
             <div class="page-header">
                 <h1>// import collection</h1>
-                <p>Upload a ManaBox CSV export to populate your inventory. Re-importing is safe — quantities accumulate on conflict.</p>
+                <p>Upload a ManaBox or CardSphere CSV export to populate your inventory. Quantities accumulate when the same card, finish, condition and location already exist.</p>
             </div>
 
             <div class="upload-card">
@@ -372,6 +402,42 @@
                     </div>
 
                     <div class="file-selected" id="file-selected"></div>
+
+                    <div class="import-options">
+                        <span class="option-label">Destination</span>
+                        <div class="radio-group">
+                            <div class="radio-option">
+                                <input type="radio" name="dest" id="dest-chaos" value="chaos" checked>
+                                <label for="dest-chaos">Chaos Warehousing</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" name="dest" id="dest-existing" value="existing" {% if locations | length == 0 %}disabled{% endif %}>
+                                <label for="dest-existing">Existing location</label>
+                            </div>
+                            <div class="radio-option">
+                                <input type="radio" name="dest" id="dest-new" value="new">
+                                <label for="dest-new">New location</label>
+                            </div>
+                        </div>
+
+                        <div class="dest-panel active" id="panel-chaos">
+                            <p class="dest-note">Cards go into a brand-new location named with a random ID (e.g. <code>CHAOS-7KQ2M9XA</code>), unique to this import. Sort them into real locations later from the inventory.</p>
+                        </div>
+                        <div class="dest-panel" id="panel-existing">
+                            <select class="dest-input" name="location_id" id="location-id">
+                                {% for loc in locations %}
+                                <option value="{{ loc.id }}">{{ loc.name }} ({{ loc.location_type }})</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="dest-panel" id="panel-new">
+                            <input class="dest-input" type="text" name="new_location_name" id="new-location-name" placeholder="Location name, e.g. Binder 4">
+                            <select class="dest-input" name="new_location_type" style="flex:0 0 auto">
+                                <option value="binder">binder</option>
+                                <option value="box">box</option>
+                            </select>
+                        </div>
+                    </div>
 
                     <div class="import-options">
                         <span class="option-label">On duplicate lot</span>
@@ -434,6 +500,15 @@
             fileLabel.textContent = `📄 ${name}`;
         }
 
+        // Destination panels
+        const newName = document.getElementById('new-location-name');
+        document.querySelectorAll('input[name="dest"]').forEach(r => r.addEventListener('change', () => {
+            const dest = document.querySelector('input[name="dest"]:checked').value;
+            ['chaos', 'existing', 'new'].forEach(d =>
+                document.getElementById('panel-' + d).classList.toggle('active', d === dest));
+            newName.required = (dest === 'new');
+        }));
+
         // HTMX-style submit via fetch
         form.addEventListener('submit', async e => {
             e.preventDefault();
@@ -454,5 +529,6 @@
             }
         });
     </script>
+    {% include "_footer.html" %}
 </body>
 </html>

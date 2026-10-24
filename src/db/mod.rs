@@ -1,5 +1,6 @@
 pub mod bulk;
 pub mod import;
+pub mod sets;
 
 use anyhow::Result;
 use sqlx::{sqlite::SqlitePoolOptions, SqlitePool};
