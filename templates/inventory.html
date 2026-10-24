@@ -214,6 +214,7 @@
         }
 
         tr:last-child td { border-bottom: none; }
+        tr.inv-row { scroll-margin-top: 1rem; }
 
         tr:hover td { background: rgba(255,255,255,0.02); }
 
@@ -328,7 +329,8 @@
             <div class="pager-row">
                 <span class="pager-label">Jump to</span>
                 {% for l in letters %}
-                    {% if l.href %}<a class="pg-letter{% if l.current %} current{% endif %}" href="{{ l.href }}">{{ l.label }}</a>
+                    {% if l.row %}<a class="pg-letter{% if l.current %} current{% endif %}" href="#lot-{{ l.row }}" data-scroll-to="lot-{{ l.row }}">{{ l.label }}</a>
+                    {% elif l.href %}<a class="pg-letter{% if l.current %} current{% endif %}" href="{{ l.href }}">{{ l.label }}</a>
                     {% else %}<span class="pg-letter disabled">{{ l.label }}</span>{% endif %}
                 {% endfor %}
             </div>
@@ -384,7 +386,7 @@
                 <option value="{{ f }}" {% if filter_foil == f %}selected{% endif %}>{{ f }}</option>
                 {% endfor %}
             </select>
-            <select class="filter-input" name="per_page" title="Cards per page" onchange="this.form.submit()">
+            <select class="filter-input" name="per_page" title="Cards per page" >
                 {% for n in per_page_options %}
                 <option value="{{ n }}" {% if per_page == n %}selected{% endif %}>{% if n == "all" %}Show all{% else %}{{ n }} per page{% endif %}</option>
                 {% endfor %}
@@ -422,7 +424,7 @@
                 </thead>
                 <tbody>
                     {% for row in rows %}
-                    <tr class="inv-row" data-lot-id="{{ row.lot_id }}"
+                    <tr class="inv-row" id="lot-{{ row.lot_id }}" data-lot-id="{{ row.lot_id }}"
                         data-lot='{"lot_id":{{ row.lot_id }},"condition":"{{ row.condition }}","foil":"{{ row.foil }}","quantity":{{ row.quantity }},"acquisition_cost":{{ row.acquisition_cost or "null" }},"location_id":{{ row.location_id or "null" }},"location_name":"{{ row.location_name or "" }}","shop_price":{{ row.shop_price or "null" }},"notes":"{{ row.notes or "" }}","price_usd":{{ row.price_usd or "null" }}}'>
                         <td class="cb-col" onclick="event.stopPropagation()">
                             <input type="checkbox" class="lot-chk" data-lot-id="{{ row.lot_id }}" onchange="updateBulkBar()">
@@ -498,6 +500,21 @@
             })).filter(l => l.id > 0);
             return _locations;
         }
+
+        // ── Letter jump within the current page ──────────────────────────────
+        document.querySelectorAll('[data-scroll-to]').forEach(a => a.addEventListener('click', e => {
+            e.preventDefault();
+            const row = document.getElementById(a.dataset.scrollTo);
+            if (!row) return;
+            row.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            row.querySelectorAll('td').forEach(td => td.animate(
+                [{ background: 'rgba(74,158,255,0.25)' }, { background: 'transparent' }],
+                { duration: 1500 }));
+        }));
+
+        // ── Filter dropdowns apply immediately ───────────────────────────────
+        document.querySelectorAll('form.filters select').forEach(sel =>
+            sel.addEventListener('change', () => sel.form.submit()));
 
         // ── Quick ±1 qty ─────────────────────────────────────────────────────
         async function quickQty(lotId, delta, btn) {

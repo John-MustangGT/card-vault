@@ -229,9 +229,16 @@ pub async fn inventory_page(
         entries.insert(0, '#');
         for ch in entries {
             let start = letter_starts.iter().find(|(c, _)| *c == ch).map(|(_, i)| *i);
+            // If the letter's first card is on the page being shown, scroll to its row
+            // instead of reloading (only valid while rows are in name order).
+            let local_row = start
+                .filter(|i| by_name && i / page_size + 1 == view.page)
+                .and_then(|i| rows.get(i % page_size))
+                .map(|r| r.lot_id);
             out.push(serde_json::json!({
                 "label": ch.to_string(),
                 "href": start.map(|i| view.url(i / page_size + 1, "name", false)),
+                "row": local_row,
                 "current": current_letter == Some(ch),
             }));
         }
