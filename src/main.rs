@@ -93,6 +93,8 @@ async fn main() -> Result<()> {
         .route("/labels/generate", post(routes::labels::generate_uids))
         .route("/labels/print", get(routes::labels::labels_print))
         .route("/labels/next-uid", get(routes::labels::next_uid))
+        .route("/labels/chaos/generate", post(routes::labels::generate_chaos))
+        .route("/labels/chaos/print", get(routes::labels::chaos_labels_print))
         .route("/sealed", get(routes::sealed::sealed_page))
         .route("/sealed", post(routes::sealed::create_sealed))
         .route("/sealed/:id/qty", post(routes::sealed::adjust_qty))

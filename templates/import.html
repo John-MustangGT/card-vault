@@ -421,7 +421,13 @@
                         </div>
 
                         <div class="dest-panel active" id="panel-chaos">
-                            <p class="dest-note">Cards go into a brand-new location named with a random ID (e.g. <code>CHAOS-7KQ2M9XA</code>), unique to this import. Sort them into real locations later from the inventory.</p>
+                            <select class="dest-input" name="chaos_location_id">
+                                <option value="">Auto — new location with a random ID</option>
+                                {% for c in chaos_labels %}
+                                <option value="{{ c.id }}">{{ c.name }} (pre-printed)</option>
+                                {% endfor %}
+                            </select>
+                            <p class="dest-note">Auto creates a brand-new <code>CHAOS-7KQ2M9XA</code>-style location for this import. Pick a pre-printed label to load the group into that location instead. Sort cards into real locations later from the inventory.</p>
                         </div>
                         <div class="dest-panel" id="panel-existing">
                             <select class="dest-input" name="location_id" id="location-id">

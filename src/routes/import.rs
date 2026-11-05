@@ -9,6 +9,24 @@ use tracing::info;
 use crate::db::import::{import_cardsphere_csv, import_manabox_csv};
 use crate::AppState;
 
+/// Description stored on chaos locations made from the Labels page.
+pub const PREPRINTED: &str = "Pre-printed chaos label";
+
+/// Pre-printed chaos locations that no inventory or single card has been placed in yet.
+pub async fn unused_preprinted_chaos(pool: &sqlx::SqlitePool) -> Result<Vec<(i64, String)>, sqlx::Error> {
+    let rows = sqlx::query(
+        r#"SELECT sl.id, sl.name FROM storage_locations sl
+           WHERE sl."type" = 'chaos' AND sl.description = ?
+             AND NOT EXISTS (SELECT 1 FROM inventory_lots il WHERE il.location_id = sl.id)
+             AND NOT EXISTS (SELECT 1 FROM individual_cards ic WHERE ic.location_id = sl.id)
+           ORDER BY sl.id"#,
+    )
+    .bind(PREPRINTED)
+    .fetch_all(pool)
+    .await?;
+    Ok(rows.iter().map(|r| (r.get("id"), r.get("name"))).collect())
+}
+
 pub async fn import_page(State(state): State<Arc<AppState>>) -> Html<String> {
     let rows = sqlx::query(
         r#"SELECT id, "type" AS location_type, name FROM storage_locations
@@ -29,8 +47,15 @@ pub async fn import_page(State(state): State<Arc<AppState>>) -> Html<String> {
         })
         .collect();
 
+    let chaos_labels: Vec<serde_json::Value> = unused_preprinted_chaos(&state.pool)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .map(|(id, name)| serde_json::json!({ "id": id, "name": name }))
+        .collect();
+
     let tmpl = state.env.get_template("import.html").expect("import.html missing");
-    Html(tmpl.render(minijinja::context! { locations => locations }).expect("template render failed"))
+    Html(tmpl.render(minijinja::context! { locations => locations, chaos_labels => chaos_labels }).expect("template render failed"))
 }
 
 pub async fn handle_import(
@@ -41,6 +66,7 @@ pub async fn handle_import(
     let mut filename = String::new();
     let mut dest = String::from("chaos");
     let mut location_id: Option<i64> = None;
+    let mut chaos_label_id: Option<i64> = None;
     let mut new_name = String::new();
     let mut new_type = String::from("binder");
 
@@ -56,6 +82,9 @@ pub async fn handle_import(
             "dest" => dest = field.text().await.unwrap_or_default(),
             "location_id" => {
                 location_id = field.text().await.unwrap_or_default().trim().parse::<i64>().ok();
+            }
+            "chaos_location_id" => {
+                chaos_label_id = field.text().await.unwrap_or_default().trim().parse::<i64>().ok();
             }
             "new_location_name" => new_name = field.text().await.unwrap_or_default().trim().to_string(),
             "new_location_type" => new_type = field.text().await.unwrap_or_default(),
@@ -96,17 +125,30 @@ pub async fn handle_import(
                 Err(e) => return Html(error_html(&format!("Could not create location: {e}"))),
             }
         }
-        _ => {
-            let description = if filename.is_empty() {
-                "Chaos warehouse import".to_string()
-            } else {
-                format!("Chaos warehouse import of {filename}")
-            };
-            match create_chaos_location(&state, &description).await {
-                Ok(v) => (v, true),
-                Err(e) => return Html(error_html(&format!("Could not create location: {e}"))),
+        _ => match chaos_label_id {
+            Some(id) => {
+                let picked = unused_preprinted_chaos(&state.pool)
+                    .await
+                    .unwrap_or_default()
+                    .into_iter()
+                    .find(|(loc_id, _)| *loc_id == id);
+                match picked {
+                    Some(loc) => (loc, false),
+                    None => return Html(error_html("That pre-printed chaos label is already in use.")),
+                }
             }
-        }
+            None => {
+                let description = if filename.is_empty() {
+                    "Chaos warehouse import".to_string()
+                } else {
+                    format!("Chaos warehouse import of {filename}")
+                };
+                match create_chaos_location(&state, &description).await {
+                    Ok(v) => (v, true),
+                    Err(e) => return Html(error_html(&format!("Could not create location: {e}"))),
+                }
+            }
+        },
     };
     let (loc_id, loc_name) = location;
 
@@ -166,7 +208,7 @@ async fn find_or_create_location(
 }
 
 /// Create a location named with a fresh random id, e.g. `CHAOS-7KQ2M9XA`.
-async fn create_chaos_location(state: &AppState, description: &str) -> Result<(i64, String), sqlx::Error> {
+pub async fn create_chaos_location(state: &AppState, description: &str) -> Result<(i64, String), sqlx::Error> {
     // Unambiguous characters only (no 0/O, 1/I) since these get read off screens and labels.
     const ALPHABET: [char; 32] = [
         '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H',

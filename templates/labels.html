@@ -124,6 +124,38 @@
             <p class="note">Opens in a new tab. Use your browser's Print dialog (Ctrl+P / Cmd+P). Set paper to Letter, no scaling, no margins.</p>
         </div>
 
+        <!-- Chaos warehouse locations -->
+        <div class="panel">
+            <div class="section-title">Chaos Warehouse Locations</div>
+            <form method="post" action="/labels/chaos/generate">
+                <div class="form-row">
+                    <div class="field">
+                        <label>Count</label>
+                        <input type="number" name="count" value="30" min="1" max="300" style="width:100px">
+                    </div>
+                    <div class="field" style="justify-content:flex-end">
+                        <button type="submit" class="btn">Generate Locations</button>
+                    </div>
+                </div>
+            </form>
+            <p class="note">Creates empty <code>CHAOS-XXXXXXXX</code> locations under Locations. {{ chaos_unused }} unused and waiting to print or import into. Pick one on the Import page to load a group into it.</p>
+        </div>
+        <!-- Print chaos labels -->
+        <div class="panel">
+            <div class="section-title">Print Chaos Labels — Avery 5180 (30 per sheet)</div>
+            <form method="get" action="/labels/chaos/print" target="_blank">
+                <div class="form-row">
+                    <div class="field">
+                        <label>Label Count</label>
+                        <input type="number" name="count" value="{{ [chaos_unused, 30] | min }}" min="1" max="30" style="width:80px">
+                    </div>
+                    <div class="field" style="justify-content:flex-end">
+                        <button type="submit" class="btn btn-ghost">Open Print Sheet</button>
+                    </div>
+                </div>
+            </form>
+            <p class="note">Prints the oldest unused locations. Labels already loaded with inventory are skipped. Set paper to Letter, no scaling, no margins. Check the layout on plain paper before using label stock.</p>
+        </div>
         <!-- Available UIDs -->
         {% if pool_uids | length > 0 %}
         <div class="panel">

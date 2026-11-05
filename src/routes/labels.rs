@@ -48,12 +48,18 @@ pub async fn labels_page(State(state): State<Arc<AppState>>) -> Html<String> {
         .map(|r| r.get::<String, _>("uid"))
         .collect();
 
+    let chaos_unused = crate::routes::import::unused_preprinted_chaos(&state.pool)
+        .await
+        .map(|v| v.len())
+        .unwrap_or(0);
+
     let tmpl = state.env.get_template("labels.html").expect("labels.html missing");
     let ctx = minijinja::context! {
         total   => total,
         unused  => unused,
         used    => total - unused,
         pool_uids => pool_uids,
+        chaos_unused => chaos_unused,
     };
     Html(tmpl.render(ctx).expect("template render failed"))
 }
@@ -122,6 +128,51 @@ pub async fn labels_print(
         uids  => uids,
         brand => brand,
     };
+    Html(tmpl.render(ctx).expect("template render failed"))
+}
+
+#[derive(Deserialize)]
+pub struct ChaosForm {
+    pub count: Option<i64>,
+}
+
+pub async fn generate_chaos(
+    State(state): State<Arc<AppState>>,
+    Form(form): Form<ChaosForm>,
+) -> Redirect {
+    use crate::routes::import::{create_chaos_location, PREPRINTED};
+    let count = form.count.unwrap_or(30).clamp(1, 300);
+    for _ in 0..count {
+        if create_chaos_location(&state, PREPRINTED).await.is_err() {
+            break;
+        }
+    }
+    Redirect::to("/labels")
+}
+
+#[derive(Deserialize)]
+pub struct ChaosPrintQuery {
+    pub count: Option<i64>,
+}
+
+pub async fn chaos_labels_print(
+    State(state): State<Arc<AppState>>,
+    Query(params): Query<ChaosPrintQuery>,
+) -> Html<String> {
+    let count = params.count.unwrap_or(30).clamp(1, 30) as usize;
+    let names: Vec<String> = crate::routes::import::unused_preprinted_chaos(&state.pool)
+        .await
+        .unwrap_or_default()
+        .into_iter()
+        .take(count)
+        .map(|(_, name)| name)
+        .collect();
+
+    let tmpl = state
+        .env
+        .get_template("labels_chaos_print.html")
+        .expect("labels_chaos_print.html missing");
+    let ctx = minijinja::context! { names => names };
     Html(tmpl.render(ctx).expect("template render failed"))
 }
 
