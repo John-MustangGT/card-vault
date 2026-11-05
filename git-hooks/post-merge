@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+# Back up the card-vault SQLite database after a successful `git pull`.
+# Installed locally in .git/hooks (not tracked by git) — copy to the LXC clone too.
+
+set -u
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+BACKUP_DIR="${CARD_VAULT_BACKUP_DIR:-$HOME/backups/card-vault}"
+KEEP="${CARD_VAULT_BACKUP_KEEP:-30}"
+
+# Resolve DB path from .env (DATABASE_URL=sqlite:./card-vault.db)
+DB_URL="$(grep -E '^DATABASE_URL=' "$REPO_ROOT/.env" 2>/dev/null | tail -n1 | cut -d= -f2-)"
+DB_URL="${DB_URL%\"}"; DB_URL="${DB_URL#\"}"
+DB_PATH="${DB_URL#sqlite:}"
+DB_PATH="${DB_PATH#//}"
+case "$DB_PATH" in
+  /*) ;;
+  *) DB_PATH="$REPO_ROOT/${DB_PATH#./}" ;;
+esac
+
+if [ ! -f "$DB_PATH" ]; then
+  echo "[post-merge] No database at $DB_PATH — skipping backup."
+  exit 0
+fi
+
+mkdir -p "$BACKUP_DIR" || { echo "[post-merge] Cannot create $BACKUP_DIR"; exit 0; }
+
+STAMP="$(date +%Y%m%d-%H%M%S)"
+DEST="$BACKUP_DIR/card-vault-$STAMP.db"
+
+if command -v sqlite3 >/dev/null 2>&1; then
+  # .backup is consistent even while the server holds the WAL open
+  if sqlite3 "$DB_PATH" ".backup '$DEST'"; then
+    echo "[post-merge] Database backed up to $DEST"
+  else
+    echo "[post-merge] WARNING: sqlite3 backup failed."
+    rm -f "$DEST"
+    exit 0
+  fi
+else
+  echo "[post-merge] WARNING: sqlite3 not installed; falling back to file copy."
+  cp "$DB_PATH" "$DEST" || { echo "[post-merge] Copy failed."; exit 0; }
+  echo "[post-merge] Database copied to $DEST"
+fi
+
+# Prune old backups, keeping the newest $KEEP
+ls -1t "$BACKUP_DIR"/card-vault-*.db 2>/dev/null | tail -n +"$((KEEP + 1))" | xargs -r rm -f
+
+exit 0
