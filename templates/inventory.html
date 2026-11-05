@@ -305,6 +305,15 @@
         .bulk-loc-select { background: var(--bg); border: 1px solid var(--border); border-radius: 4px;
                            color: var(--text); font-family: var(--mono); font-size: 0.75rem; padding: 0.32rem 0.55rem; outline: none; }
         .bulk-loc-select:focus { border-color: var(--accent); }
+
+        /* Card hover preview */
+        .card-name[data-img] { cursor: pointer; }
+        #card-preview {
+            display: none; position: fixed; top: 0; left: 0; z-index: 300; pointer-events: none;
+            border-radius: 4.5% / 3.2%; box-shadow: 0 8px 32px rgba(0,0,0,0.7);
+        }
+        #card-preview.visible { display: block; }
+        #card-preview img { display: block; width: 250px; height: auto; border-radius: 4.5% / 3.2%; }
     </style>
 </head>
 <body>
@@ -346,6 +355,8 @@
             </div>
         </div>
     {% endmacro %}
+
+    <div id="card-preview"><img alt=""></div>
 
     <main>
         <div class="page-header">
@@ -429,7 +440,7 @@
                         <td class="cb-col" onclick="event.stopPropagation()">
                             <input type="checkbox" class="lot-chk" data-lot-id="{{ row.lot_id }}" onchange="updateBulkBar()">
                         </td>
-                        <td class="card-name" style="cursor:pointer" onclick="window.location='/inventory/card/{{ row.scryfall_id }}'">
+                        <td class="card-name" style="cursor:pointer" data-img="{{ row.image_uri or ('https://api.scryfall.com/cards/' ~ row.scryfall_id ~ '?format=image&version=normal') }}" onclick="window.location='/inventory/card/{{ row.scryfall_id }}'">
                             {{ row.name }}
                         </td>
                         <td class="set-info" style="cursor:pointer" onclick="window.location='/inventory/card/{{ row.scryfall_id }}'">
@@ -680,6 +691,36 @@
 
             toggleEdit(lotId); // close
         }
+
+        // ── Card hover preview ────────────────────────────────────────────────
+        (function () {
+            const preview = document.getElementById('card-preview');
+            const img = preview.querySelector('img');
+            const W = 250, H = 349, GAP = 16;
+            let current = null;
+
+            function place(e) {
+                const x = e.clientX + GAP + W > window.innerWidth ? e.clientX - GAP - W : e.clientX + GAP;
+                const y = Math.min(Math.max(e.clientY - H / 2, 8), window.innerHeight - H - 8);
+                preview.style.transform = `translate(${x}px, ${y}px)`;
+            }
+
+            document.addEventListener('mouseover', e => {
+                const cell = e.target.closest('td.card-name[data-img]');
+                if (!cell || cell === current) return;
+                current = cell;
+                img.src = cell.dataset.img;
+                preview.classList.add('visible');
+                place(e);
+            });
+            document.addEventListener('mousemove', e => { if (current) place(e); });
+            document.addEventListener('mouseout', e => {
+                if (current && !current.contains(e.relatedTarget)) {
+                    current = null;
+                    preview.classList.remove('visible');
+                }
+            });
+        })();
 
         // ── Checkboxes + bulk bar ─────────────────────────────────────────────
         function toggleAll(master) {
