@@ -425,7 +425,7 @@
                 <tbody>
                     {% for row in rows %}
                     <tr class="inv-row" id="lot-{{ row.lot_id }}" data-lot-id="{{ row.lot_id }}"
-                        data-lot='{"lot_id":{{ row.lot_id }},"condition":"{{ row.condition }}","foil":"{{ row.foil }}","quantity":{{ row.quantity }},"acquisition_cost":{{ row.acquisition_cost or "null" }},"location_id":{{ row.location_id or "null" }},"location_name":"{{ row.location_name or "" }}","shop_price":{{ row.shop_price or "null" }},"notes":"{{ row.notes or "" }}","price_usd":{{ row.price_usd or "null" }}}'>
+                        data-lot='{"lot_id":{{ row.lot_id }},"language":"{{ row.language }}","condition":"{{ row.condition }}","foil":"{{ row.foil }}","quantity":{{ row.quantity }},"acquisition_cost":{{ row.acquisition_cost or "null" }},"location_id":{{ row.location_id or "null" }},"location_name":"{{ row.location_name or "" }}","shop_price":{{ row.shop_price or "null" }},"notes":"{{ row.notes or "" }}","price_usd":{{ row.price_usd or "null" }}}'>
                         <td class="cb-col" onclick="event.stopPropagation()">
                             <input type="checkbox" class="lot-chk" data-lot-id="{{ row.lot_id }}" onchange="updateBulkBar()">
                         </td>
@@ -538,6 +538,14 @@
         }
 
         // ── Inline edit row ──────────────────────────────────────────────────
+        const LANGUAGES = [
+            ['en', 'English'], ['ja', 'Japanese'], ['de', 'German'], ['fr', 'French'],
+            ['it', 'Italian'], ['es', 'Spanish'], ['pt', 'Portuguese'], ['ko', 'Korean'],
+            ['ru', 'Russian'], ['zhs', 'Chinese (Simplified)'], ['zht', 'Chinese (Traditional)'],
+            ['ph', 'Phyrexian'], ['ar', 'Arabic'], ['he', 'Hebrew'], ['la', 'Latin'],
+            ['grc', 'Ancient Greek'], ['sa', 'Sanskrit'], ['qya', 'Quenya'],
+        ];
+
         async function toggleEdit(lotId) {
             const btn = document.getElementById('edit-btn-' + lotId);
             const existing = document.getElementById('edit-row-' + lotId);
@@ -558,6 +566,12 @@
             editTr.id = 'edit-row-' + lotId;
             editTr.className = 'edit-row';
             editTr.innerHTML = `<td colspan="10"><div class="edit-panel">
+                <div class="ep-field">
+                    <span class="ep-label">Language</span>
+                    <select class="ep-input" id="ep-lang-${lotId}">
+                        ${LANGUAGES.map(([code, name]) => `<option value="${code}" ${d.language===code?'selected':''}>${name}</option>`).join('')}
+                    </select>
+                </div>
                 <div class="ep-field">
                     <span class="ep-label">Condition</span>
                     <select class="ep-input" id="ep-cond-${lotId}">
@@ -606,6 +620,7 @@
             const d    = JSON.parse(tr.dataset.lot);
             const get  = id => document.getElementById(id);
 
+            const language  = get(`ep-lang-${lotId}`).value;
             const condition = get(`ep-cond-${lotId}`).value;
             const foil      = get(`ep-foil-${lotId}`).value;
             const quantity  = parseInt(get(`ep-qty-${lotId}`).value) || 0;
@@ -615,7 +630,7 @@
             const notes     = get(`ep-notes-${lotId}`).value.trim();
 
             const body = {
-                condition, foil, quantity, notes,
+                language, condition, foil, quantity, notes,
                 acquisition_cost: costRaw ? parseFloat(costRaw) : null,
                 location_id:      locId || null,
             };
@@ -655,7 +670,7 @@
 
             // Refresh the row's data-lot so future edits see new values
             tr.dataset.lot = JSON.stringify(Object.assign(d, {
-                condition, foil, quantity,
+                language, condition, foil, quantity,
                 acquisition_cost: body.acquisition_cost,
                 location_id: body.location_id,
                 location_name: locId ? locName : '',

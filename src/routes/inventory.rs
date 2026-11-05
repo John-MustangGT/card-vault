@@ -630,7 +630,7 @@ pub async fn update_lot(
 
     // Read current row first so we can patch only supplied fields
     let cur = sqlx::query(
-        "SELECT scryfall_id, condition, foil, quantity, acquisition_cost, location_id, shop_price, notes
+        "SELECT scryfall_id, language, condition, foil, quantity, acquisition_cost, location_id, shop_price, notes
          FROM inventory_lots WHERE id = ?",
     )
     .bind(lot_id)
@@ -644,6 +644,7 @@ pub async fn update_lot(
     };
 
     // Helper: take new value from JSON body if present, else keep current
+    let language   = body["language"].as_str().unwrap_or_else(|| cur.get("language")).to_string();
     let condition  = body["condition"].as_str().unwrap_or_else(|| cur.get("condition")).to_string();
     let foil       = body["foil"].as_str().unwrap_or_else(|| cur.get("foil")).to_string();
     let quantity   = body["quantity"].as_i64().unwrap_or_else(|| cur.get::<i64, _>("quantity")).max(0);
@@ -678,16 +679,40 @@ pub async fn update_lot(
     // If another lot already holds this card/finish/condition at the target
     // location, fold this lot into it instead of creating a duplicate.
     let scryfall_id: String = cur.get("scryfall_id");
-    let twin = find_twin(&state.pool, lot_id, &scryfall_id, &foil, &condition, location_id).await;
+
+    // A language change applies to the printing itself, so every lot of it follows.
+    if language != cur.get::<String, _>("language") {
+        let synced = async {
+            let mut tx = state.pool.begin().await?;
+            sqlx::query("UPDATE scryfall_cards SET language = ? WHERE scryfall_id = ?")
+                .bind(&language)
+                .bind(&scryfall_id)
+                .execute(&mut *tx)
+                .await?;
+            sqlx::query("UPDATE inventory_lots SET language = ? WHERE scryfall_id = ?")
+                .bind(&language)
+                .bind(&scryfall_id)
+                .execute(&mut *tx)
+                .await?;
+            tx.commit().await
+        }
+        .await;
+        if let Err(e) = synced {
+            return Json(serde_json::json!({ "ok": false, "error": e.to_string() }));
+        }
+    }
+
+    let twin = find_twin(&state.pool, lot_id, &scryfall_id, &language, &foil, &condition, location_id).await;
 
     let result = match twin {
         Some(dst) => merge_into(&state.pool, lot_id, dst, quantity, now).await,
         None => sqlx::query(
             "UPDATE inventory_lots
-             SET condition = ?, foil = ?, quantity = ?, acquisition_cost = ?,
+             SET language = ?, condition = ?, foil = ?, quantity = ?, acquisition_cost = ?,
                  location_id = ?, shop_price = ?, notes = ?, updated_at = ?
              WHERE id = ?",
         )
+        .bind(&language)
         .bind(&condition)
         .bind(&foil)
         .bind(quantity)
@@ -711,6 +736,7 @@ pub async fn update_lot(
             "quantity": quantity,
             "acquisition_cost": acquisition_cost,
             "location_id": location_id,
+            "language": language,
             "shop_price": shop_price,
             "notes": notes,
             "merged": merged,
@@ -719,22 +745,24 @@ pub async fn update_lot(
     }
 }
 
-/// Another lot (not `lot_id`) with the same card, finish and condition at `location_id`.
+/// Another lot (not `lot_id`) with the same card, language, finish and condition at `location_id`.
 async fn find_twin(
     pool: &sqlx::SqlitePool,
     lot_id: i64,
     scryfall_id: &str,
+    language: &str,
     foil: &str,
     condition: &str,
     location_id: Option<i64>,
 ) -> Option<i64> {
     sqlx::query_scalar(
         "SELECT id FROM inventory_lots
-         WHERE id != ? AND scryfall_id = ? AND foil = ? AND condition = ?
+         WHERE id != ? AND scryfall_id = ? AND language = ? AND foil = ? AND condition = ?
            AND COALESCE(location_id, 0) = COALESCE(?, 0)",
     )
     .bind(lot_id)
     .bind(scryfall_id)
+    .bind(language)
     .bind(foil)
     .bind(condition)
     .bind(location_id)
@@ -804,7 +832,7 @@ pub async fn bulk_move_lots(
     let mut updated = 0i64;
     let mut merged = 0i64;
     for id in &body.lot_ids {
-        let Some(lot) = sqlx::query("SELECT scryfall_id, foil, condition, quantity FROM inventory_lots WHERE id = ?")
+        let Some(lot) = sqlx::query("SELECT scryfall_id, language, foil, condition, quantity FROM inventory_lots WHERE id = ?")
             .bind(id)
             .fetch_optional(&state.pool)
             .await
@@ -814,12 +842,13 @@ pub async fn bulk_move_lots(
             continue;
         };
         let scryfall_id: String = lot.get("scryfall_id");
+        let language: String = lot.get("language");
         let foil: String = lot.get("foil");
         let condition: String = lot.get("condition");
         let quantity: i64 = lot.get("quantity");
 
-        // Moving onto an identical lot (same card/finish/condition) merges the two
-        let twin = find_twin(&state.pool, *id, &scryfall_id, &foil, &condition, body.location_id).await;
+        // Moving onto an identical lot (same card/language/finish/condition) merges the two
+        let twin = find_twin(&state.pool, *id, &scryfall_id, &language, &foil, &condition, body.location_id).await;
         let ok = match twin {
             Some(dst) => {
                 let r = merge_into(&state.pool, *id, dst, quantity, now).await.is_ok();
@@ -928,7 +957,7 @@ async fn fetch_inventory(
             sc.set_code,
             sc.set_name,
             sc.collector_number,
-            sc.language,
+            il.language,
             il.foil,
             il.condition,
             il.quantity,

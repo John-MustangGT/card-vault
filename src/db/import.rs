@@ -89,8 +89,34 @@ fn normalize_foil(f: &str) -> &'static str {
     }
 }
 
+/// Map a CSV language value (ISO-style code, Scryfall code or English name) to a Scryfall language code.
 fn normalize_language(lang: &str) -> String {
-    lang.to_lowercase()
+    let key = lang.trim().to_lowercase();
+    let code = match key.as_str() {
+        "en" | "english" => "en",
+        "ja" | "jp" | "japanese" => "ja",
+        "de" | "german" => "de",
+        "fr" | "french" => "fr",
+        "it" | "italian" => "it",
+        "es" | "spanish" => "es",
+        "pt" | "portuguese" => "pt",
+        "ko" | "kr" | "korean" => "ko",
+        "ru" | "russian" => "ru",
+        "zhs" | "cs" | "zh-cn" | "zhcn" | "chinese simplified" | "chinese (simplified)" => "zhs",
+        "zht" | "ct" | "zh-tw" | "zhtw" | "chinese traditional" | "chinese (traditional)" => "zht",
+        "ph" | "phyrexian" => "ph",
+        "ar" | "arabic" => "ar",
+        "he" | "iw" | "hebrew" => "he",
+        "la" | "latin" => "la",
+        "grc" | "ancient greek" => "grc",
+        "sa" | "sanskrit" => "sa",
+        "qya" | "quenya" => "qya",
+        _ => {
+            warn!("Unrecognized card language '{}', storing as-is", lang);
+            return key;
+        }
+    };
+    code.to_string()
 }
 
 fn tags_to_json(tags: &Option<String>) -> Option<String> {
@@ -189,16 +215,17 @@ pub async fn import_cardsphere_csv(
         let upsert_lot = sqlx::query(
             r#"
             INSERT INTO inventory_lots
-                (scryfall_id, foil, condition, quantity, acquisition_currency,
+                (scryfall_id, language, foil, condition, quantity, acquisition_currency,
                  tags, location_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, 'USD', ?, ?, ?, ?)
-            ON CONFLICT(scryfall_id, foil, condition, COALESCE(location_id, 0)) DO UPDATE SET
+            VALUES (?, ?, ?, ?, ?, 'USD', ?, ?, ?, ?)
+            ON CONFLICT(scryfall_id, language, foil, condition, COALESCE(location_id, 0)) DO UPDATE SET
                 quantity   = quantity + excluded.quantity,
                 tags       = COALESCE(excluded.tags, tags),
                 updated_at = excluded.updated_at
             "#,
         )
         .bind(&scryfall_id)
+        .bind(&language)
         .bind(foil)
         .bind(condition)
         .bind(row.count)
@@ -247,6 +274,8 @@ pub async fn import_manabox_csv(
             }
         };
 
+        let language = normalize_language(&row.language);
+
         // Upsert scryfall_cards cache (minimal data from CSV; image_uri hydrated later)
         let upsert_card = sqlx::query(
             r#"
@@ -269,7 +298,7 @@ pub async fn import_manabox_csv(
         .bind(&row.set_name)
         .bind(&row.collector_number)
         .bind(&row.rarity)
-        .bind(&row.language)
+        .bind(&language)
         .bind(now)
         .execute(pool)
         .await;
@@ -299,10 +328,10 @@ pub async fn import_manabox_csv(
         let upsert_lot = sqlx::query(
             r#"
             INSERT INTO inventory_lots
-                (scryfall_id, foil, condition, quantity, acquisition_cost,
+                (scryfall_id, language, foil, condition, quantity, acquisition_cost,
                  acquisition_currency, manabox_id, location_id, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            ON CONFLICT(scryfall_id, foil, condition, COALESCE(location_id, 0)) DO UPDATE SET
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(scryfall_id, language, foil, condition, COALESCE(location_id, 0)) DO UPDATE SET
                 quantity             = quantity + excluded.quantity,
                 acquisition_cost     = COALESCE(acquisition_cost, excluded.acquisition_cost),
                 manabox_id           = COALESCE(manabox_id, excluded.manabox_id),
@@ -310,6 +339,7 @@ pub async fn import_manabox_csv(
             "#,
         )
         .bind(&row.scryfall_id)
+        .bind(&language)
         .bind(&row.foil)
         .bind(&row.condition)
         .bind(row.quantity)
