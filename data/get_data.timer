@@ -2,6 +2,8 @@
 Description=Run get_data script every 6 hours
 
 [Timer]
+# Run 15 minutes after boot/login (the initial trigger)
+OnBootSec=15min
 # Run 6 hours after the last run
 OnUnitActiveSec=6h
 # Ensure it runs even if the machine was off
@@ -9,4 +11,3 @@ Persistent=true
 
 [Install]
 WantedBy=timers.target
-
