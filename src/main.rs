@@ -44,6 +44,7 @@ async fn main() -> Result<()> {
     env.set_loader(minijinja::path_loader("templates"));
     env.add_filter("usd", |v: f64| -> String { format!("{:.2}", v) });
     env.add_filter("f1",  |v: f64| -> String { format!("{:.1}", v) });
+    env.add_filter("urlencode", |v: String| -> String { routes::inventory::url_encode(&v) });
     let env = Arc::new(env);
 
     let state = Arc::new(AppState {

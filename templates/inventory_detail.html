@@ -69,6 +69,10 @@
         .btn-ghost:hover { color: var(--text); }
         .id-chip { font-family: var(--mono); font-size: 0.78rem; font-weight: 600; background: var(--accent-dim); color: var(--accent); padding: 0.2rem 0.5rem; border-radius: 3px; border: 1px solid rgba(74,158,255,0.3); }
         select.status-select { background: var(--bg); border: 1px solid var(--border); color: var(--text); font-family: var(--mono); font-size: 0.72rem; padding: 0.25rem 0.4rem; border-radius: 3px; }
+        .ext-links { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.9rem; }
+        .ext-link { display: inline-flex; align-items: center; gap: 0.45rem; padding: 0.25rem 0.6rem 0.25rem 0.25rem; border: 1px solid var(--border); border-radius: 4px; color: var(--text-dim); text-decoration: none; font-family: var(--mono); font-size: 0.72rem; transition: color 0.15s, border-color 0.15s; }
+        .ext-link:hover { color: var(--accent); border-color: var(--accent); }
+        .ext-icon { width: 1.5rem; height: 1.5rem; border-radius: 3px; background: var(--accent-dim); color: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 600; letter-spacing: 0.02em; }
     </style>
 </head>
 <body>
@@ -97,6 +101,29 @@
                 {% if card.collector_number %} · #{{ card.collector_number }}{% endif %}
                 {% if card.set_name %} · {{ card.set_name }}{% endif %}
                 · {{ card.language | upper }}
+            </div>
+            {% set name_q = card.name | urlencode %}
+            {% set scry_url = ('https://scryfall.com/card/' ~ (card.set_code | lower) ~ '/' ~ (card.collector_number | urlencode) ~ '/' ~ (card.language | lower)) if (card.set_code and card.collector_number) else ('https://scryfall.com/search?q=' ~ ('!"' ~ card.name ~ '"') | urlencode) %}
+            {% set edh_slug = card.name | replace(" // ", " ") | lower | replace("'", "") | replace(",", "") | replace(" ", "-") %}
+            <div class="ext-links">
+                <a class="ext-link" href="{{ scry_url }}" target="_blank" rel="noopener noreferrer" title="Scryfall">
+                    <span class="ext-icon">SF</span>Scryfall
+                </a>
+                <a class="ext-link" href="https://gatherer.wizards.com/Pages/Search/Default.aspx?name=+[%22{{ name_q }}%22]" target="_blank" rel="noopener noreferrer" title="Gatherer (official Oracle database)">
+                    <span class="ext-icon">GA</span>Gatherer
+                </a>
+                <a class="ext-link" href="https://www.tcgplayer.com/search/magic/product?q={{ name_q }}" target="_blank" rel="noopener noreferrer" title="TCGplayer">
+                    <span class="ext-icon">TC</span>TCGplayer
+                </a>
+                <a class="ext-link" href="https://www.cardmarket.com/en/Magic/Products/Search?searchString={{ name_q }}" target="_blank" rel="noopener noreferrer" title="Cardmarket">
+                    <span class="ext-icon">CM</span>Cardmarket
+                </a>
+                <a class="ext-link" href="https://www.ebay.com/sch/i.html?_nkw={{ (card.name ~ ' ' ~ (card.set_name or '')) | urlencode }}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener noreferrer" title="eBay sold listings">
+                    <span class="ext-icon">eB</span>eBay sold
+                </a>
+                <a class="ext-link" href="https://edhrec.com/cards/{{ edh_slug | urlencode }}" target="_blank" rel="noopener noreferrer" title="EDHREC">
+                    <span class="ext-icon">ED</span>EDHREC
+                </a>
             </div>
         </div>
 

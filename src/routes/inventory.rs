@@ -156,7 +156,7 @@ impl View {
     }
 }
 
-fn url_encode(s: &str) -> String {
+pub fn url_encode(s: &str) -> String {
     let mut out = String::new();
     for b in s.bytes() {
         match b {
